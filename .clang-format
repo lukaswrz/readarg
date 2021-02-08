@@ -1,0 +1,37 @@
+AlignConsecutiveMacros: true
+AlignEscapedNewlines: Left
+AllowShortBlocksOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakAfterDefinitionReturnType: All
+AlwaysBreakAfterReturnType: None
+BasedOnStyle: LLVM
+BreakBeforeBinaryOperators: None
+BreakBeforeBraces: Linux
+BreakBeforeInheritanceComma: false
+BreakBeforeTernaryOperators: true
+BreakStringLiterals: false
+ColumnLimit: 0
+IncludeBlocks: Regroup
+IncludeCategories:
+    - Regex: '^<.*>$'
+      Priority: 1
+    - Regex: '^".*"$'
+      Priority: 2
+IndentCaseLabels: false
+IndentWidth: 8
+PointerAlignment: Right
+ReflowComments:  true
+SortIncludes: true
+SortUsingDeclarations: true
+SpaceBeforeParens: ControlStatements
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 1
+SpacesInContainerLiterals: true
+SpacesInCStyleCastParentheses: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+TabWidth: 8
+UseTab: ForIndentation

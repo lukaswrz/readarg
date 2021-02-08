@@ -1,0 +1,15 @@
+# vim: set tabstop=2 shiftwidth=2 expandtab :
+
+destdir =
+prefix  = /usr/local/
+lib     = $prefix/lib/
+incl    = $prefix/include/
+
+cc      = cc
+macros  = -D _POSIX_C_SOURCE=200809L -D NDEBUG
+cflags  = --std=c99 -Wall -Wextra -Wpedantic -g $macros -O2
+arflags = -rcs
+
+header  = ./readopt.h
+static  = ./libreadopt.a
+shared  = ./libreadopt.so

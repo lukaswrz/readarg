@@ -1,0 +1,28 @@
+# vim: set tabstop=2 shiftwidth=2 expandtab :
+
+include config.ninja
+
+rule compile
+  command = $cc $cflags -c -o $out $in
+
+rule static
+  command = ar $arflags -- $out $in
+
+rule shared
+  command = $cc --shared -o $out $in
+
+rule install
+  command = cp -- $in $out
+
+build ./readopt.o: compile ./readopt.c
+build $static: static ./readopt.o
+build $shared: shared ./readopt.o
+
+build $destdir/$lib/$static: install $static
+build $destdir/$lib/$shared: install $shared
+build $destdir/$incl/$header: install $header
+
+build install: phony $destdir/$lib/$static $destdir/$lib/$shared $destdir/$incl/$header
+build all: phony $static $shared
+
+default all

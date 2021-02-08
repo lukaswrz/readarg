@@ -1,0 +1,9 @@
+*.o
+libreadopt.a
+libreadopt.so
+test/test
+test/*.o
+.ninja_deps
+.ninja_log
+test/.ninja_deps
+test/.ninja_log
