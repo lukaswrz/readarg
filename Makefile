@@ -1,52 +1,37 @@
-CC = cc
-MACROS = -DNDEBUG
-CFLAGS = $(MACROS) --std=c99 -O2 -g -Wall -Wextra -Wpedantic -fPIC
+include config.mk
 
-PREFIX = /usr/local/
-LIB = $(PREFIX)/lib/
-INCLUDE = $(PREFIX)/include/
+SOURCE = readopt.c
+OBJECT = readopt.o
 
-SOURCES = $(wildcard ./*.c)
-OBJECTS = $(SOURCES:.c=.o)
-HEADERS = $(wildcard ./*.h)
-
-STATICTARGET = libreadopt.a
-SHAREDTARGET = libreadopt.so
-
-AR = ar -rcs --
-RM = rm -f --
-CP = cp --
-MKDIR = mkdir -p --
-
-all: $(STATICTARGET) $(SHAREDTARGET)
+all: $(STATIC) $(SHARED)
 
 %.o: %.c
 	$(CC) -c $(CFLAGS) $<
 
-$(STATICTARGET): $(OBJECTS)
+$(STATIC): $(OBJECT)
 	$(AR) $@ $^
 
-$(SHAREDTARGET): $(OBJECTS)
+$(SHARED): $(OBJECT)
 	$(CC) --shared $^ -o $@
 
 install: staticinstall sharedinstall
 
-staticinstall: $(STATICTARGET)
+staticinstall: $(STATIC)
 	$(MKDIR) $(DESTDIR)$(LIB)
 	$(CP) $^ $(DESTDIR)$(LIB)
-	$(MKDIR) $(DESTDIR)$(INCLUDE)
-	$(CP) $(HEADERS) $(DESTDIR)$(INCLUDE)
+	$(MKDIR) $(DESTDIR)$(INCL)
+	$(CP) $(HEADER) $(DESTDIR)$(INCL)
 
-sharedinstall: $(SHAREDTARGET)
+sharedinstall: $(SHARED)
 	$(MKDIR) $(DESTDIR)$(LIB)
 	$(CP) $^ $(DESTDIR)$(LIB)
-	$(MKDIR) $(DESTDIR)$(INCLUDE)
-	$(CP) $(HEADERS) $(DESTDIR)$(INCLUDE)
+	$(MKDIR) $(DESTDIR)$(INCL)
+	$(CP) $(HEADER) $(DESTDIR)$(INCL)
 
 clean:
-	$(RM) $(OBJECTS) $(STATICTARGET) $(SHAREDTARGET)
+	$(RM) $(OBJECT) $(STATIC) $(SHARED)
 
 format:
-	clang-format -i -- $(SOURCES) $(HEADERS)
+	clang-format -i -- $(SOURCE) $(HEADER)
 
 .PHONY: clean install staticinstall sharedinstall format
