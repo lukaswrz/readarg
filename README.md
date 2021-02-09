@@ -21,7 +21,7 @@ It permutes `argv` to handle multiple values for each option and to assign
 values to operands.
 
 `mdoc(7)` `SYNOPSIS` sections and plaintext usage messages can be generated as
-well (via `readoptPutUsage`).
+well (via `readopt_put_usage`).
 
 An example can be found in `test/test.c`.
 
