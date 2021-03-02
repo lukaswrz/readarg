@@ -4,13 +4,13 @@
 
 #define READOPT_ALLOC_STRINGS(...) ((char *[]){__VA_ARGS__, NULL})
 
-enum readopt_status {
-	READOPT_STATUS_SUCCESS,
-	READOPT_STATUS_NOVAL,
-	READOPT_STATUS_NOTREQ,
-	READOPT_STATUS_NOTOPT,
-	READOPT_STATUS_RANGEOPT,
-	READOPT_STATUS_RANGEOPER
+enum readopt_error {
+	READOPT_ERROR_SUCCESS,
+	READOPT_ERROR_NOVAL,
+	READOPT_ERROR_NOTREQ,
+	READOPT_ERROR_NOTOPT,
+	READOPT_ERROR_RANGEOPT,
+	READOPT_ERROR_RANGEOPER
 };
 
 enum readopt_form {
@@ -69,11 +69,7 @@ struct readopt_parser {
 			struct readopt_view_strings ioper;
 		} curr;
 	} state;
-};
-
-struct readopt_answer {
-	int end;
-	enum readopt_status status;
+	enum readopt_error error;
 };
 
 struct readopt_write_context {
@@ -105,10 +101,8 @@ struct readopt_format_context {
 	struct readopt_write_context *wr;
 };
 
-/* parse everything at once until either an error occurs or the parsing process was successful */
-struct readopt_answer readopt_parse_all(struct readopt_parser *rp);
 /* iteratively parse the arguments */
-struct readopt_answer readopt_parse(struct readopt_parser *rp);
+int readopt_parse(struct readopt_parser *rp);
 /* args should always exclude the first element, like this: {.strings = argv + 1, .len = argc - 1} */
 void readopt_parser_init(struct readopt_parser *rp, struct readopt_opt *opts, struct readopt_oper *opers, struct readopt_view_strings args);
 /* args should always exclude the first element, like this: {.strings = argv + 1, .len = argc - 1} */
@@ -126,8 +120,8 @@ size_t readopt_select_lower(struct readopt_bounds bounds);
 /* pass a string like "thing=value" and get "value" back */
 char *readopt_keyval(char *s);
 
-/* write the passed status as a string via ctx */
-int readopt_put_status(enum readopt_status status, struct readopt_write_context *ctx);
+/* write the passed error as a string via ctx */
+int readopt_put_error(enum readopt_error error, struct readopt_write_context *ctx);
 /* write the usage string, either as plaintext or mdoc format */
 void readopt_put_usage(struct readopt_parser *rp, struct readopt_format_context *ctx);
 

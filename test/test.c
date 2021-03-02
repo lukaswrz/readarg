@@ -116,14 +116,14 @@ main(int argc, char **argv)
 		}
 	);
 
-	struct readopt_answer answer = readopt_parse_all(&rp);
+	while (readopt_parse(&rp));
 
-	fputs("status: ", stderr);
-	readopt_put_status(answer.status, &(struct readopt_write_context){
+	fputs("error: ", stderr);
+	readopt_put_error(rp.error, &(struct readopt_write_context){
 		.dest.stream = stderr
 	});
 	fputc('\n', stderr);
-	if (answer.status != READOPT_STATUS_SUCCESS) {
+	if (rp.error != READOPT_ERROR_SUCCESS) {
 		return EXIT_FAILURE;
 	}
 

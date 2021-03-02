@@ -3,23 +3,23 @@
 
 #include "readopt.h"
 
-static enum readopt_status parse_arg(struct readopt_parser *rp, char *arg);
+static void parse_arg(struct readopt_parser *rp, char *arg);
 
-static enum readopt_status parse_opt(struct readopt_parser *rp, enum readopt_form form, char **pos);
+static void parse_opt(struct readopt_parser *rp, enum readopt_form form, char **pos);
 
 static struct readopt_opt *match_opt(struct readopt_parser *rp, enum readopt_form form, char **needle);
 static struct readopt_opt *match_finish(struct readopt_parser *rp, char **needle, char *cmp, struct readopt_opt *opt);
 
-static enum readopt_status update_opt(struct readopt_parser *rp, char *attach, struct readopt_opt *opt);
-static enum readopt_status update_oper(struct readopt_parser *rp, struct readopt_view_strings val);
+static void update_opt(struct readopt_parser *rp, char *attach, struct readopt_opt *opt);
+static void update_oper(struct readopt_parser *rp, struct readopt_view_strings val);
 
-static enum readopt_status assign_opers(struct readopt_parser *rp);
+static void assign_opers(struct readopt_parser *rp);
 
-static enum readopt_status add_val(struct readopt_parser *rp, struct readopt_oper *oper, char *str, int end);
+static void add_val(struct readopt_parser *rp, struct readopt_oper *oper, char *str, int end);
 
 static char *skip_incl(const char *inner, char *outer);
 
-static enum readopt_status occ_opt(struct readopt_parser *rp, struct readopt_opt *opt);
+static void occ_opt(struct readopt_parser *rp, struct readopt_opt *opt);
 
 /* permutes the argument list to store a value for an option or operand */
 static void permute_val(struct readopt_parser *rp, struct readopt_view_strings *target, char *val, int end);
@@ -29,60 +29,54 @@ static void permute_rest(char **target, struct readopt_view_strings start);
 static void format_usage_opts(struct readopt_format_context *ctx, struct readopt_opt *opts);
 static void format_usage_opers(struct readopt_format_context *ctx, struct readopt_oper *opers);
 
-struct readopt_answer
-readopt_parse_all(struct readopt_parser *rp)
-{
-	struct readopt_answer answer;
-
-	do
-		answer = readopt_parse(rp);
-	while (!answer.end && answer.status == READOPT_STATUS_SUCCESS);
-
-	return answer;
-}
-
-struct readopt_answer
+int
 readopt_parse(struct readopt_parser *rp)
 {
 	/* check whether the current offset is at the end of argv */
 	size_t off = rp->state.curr.arg - rp->args.strings;
 	if (off >= rp->args.len) {
-		if (rp->state.pending)
+		if (rp->state.pending) {
 			/* the last specified option required an argument, but has been ignored */
-			return (struct readopt_answer){1, READOPT_STATUS_NOVAL};
+			rp->error = READOPT_ERROR_NOVAL;
+			return 0;
+		}
 
-		for (size_t i = 0; readopt_validate_opt(rp->opts + i); i++)
-			if (!readopt_validate_within(&rp->opts[i].cont.oper))
-				return (struct readopt_answer){1, READOPT_STATUS_RANGEOPT};
+		for (size_t i = 0; readopt_validate_opt(rp->opts + i); i++) {
+			if (!readopt_validate_within(&rp->opts[i].cont.oper)) {
+				rp->error = READOPT_ERROR_RANGEOPT;
+				return 0;
+			}
+		}
 
-		return (struct readopt_answer){1, assign_opers(rp)};
+		assign_opers(rp);
+		return 0;
 	}
 
 	if (rp->state.pending) {
-		enum readopt_status status = add_val(rp, &rp->state.curr.opt->cont.oper, *rp->state.curr.arg, 0);
+		add_val(rp, &rp->state.curr.opt->cont.oper, *rp->state.curr.arg, 0);
 		++rp->state.curr.arg;
-		return (struct readopt_answer){0, status};
+		return !rp->error;
 	}
 
-	enum readopt_status status = parse_arg(rp, *rp->state.curr.arg);
+	parse_arg(rp, *rp->state.curr.arg);
 
 	/* if grouped options are still being parsed, they should not be discarded */
 	if (!rp->state.grppos)
 		++rp->state.curr.arg;
 
-	return (struct readopt_answer){0, status};
+	return !rp->error;
 }
 
-static enum readopt_status
+static void
 parse_arg(struct readopt_parser *rp, char *arg)
 {
 	/* parse the next option in the grouped option string, which automatically advances it */
 	if (rp->state.grppos) {
-		enum readopt_status s = parse_opt(rp, READOPT_FORM_SHORT, &rp->state.grppos);
+		parse_opt(rp, READOPT_FORM_SHORT, &rp->state.grppos);
 		if (!*rp->state.grppos) {
 			rp->state.grppos = NULL;
 		}
-		return s;
+		return;
 	}
 
 	char *pos = arg;
@@ -101,30 +95,34 @@ parse_arg(struct readopt_parser *rp, char *arg)
 				assert(off);
 				if (off == 1) {
 					/* no operands after the "--" */
-					return READOPT_STATUS_SUCCESS;
-				} else {
-					enum readopt_status s = update_oper(rp, (struct readopt_view_strings){
-						.len = off - 1,
-						.strings = rp->state.curr.arg + 1
-					});
-					rp->state.curr.arg = rp->args.strings + rp->args.len - 1;
-
-					return s;
+					return;
 				}
+
+				update_oper(rp, (struct readopt_view_strings){
+					.len = off - 1,
+					.strings = rp->state.curr.arg + 1
+				});
+				rp->state.curr.arg = rp->args.strings + rp->args.len - 1;
+
+				return;
 			default:
-				return parse_opt(rp, READOPT_FORM_LONG, &pos);
+				parse_opt(rp, READOPT_FORM_LONG, &pos);
+				return;
 			}
 		case '\0':
-			return update_oper(rp, (struct readopt_view_strings){.len = 1, .strings = (char *[]){arg}});
+			update_oper(rp, (struct readopt_view_strings){.len = 1, .strings = (char *[]){arg}});
+			return;
 		default:
-			return parse_opt(rp, READOPT_FORM_SHORT, &pos);
+			parse_opt(rp, READOPT_FORM_SHORT, &pos);
+			return;
 		}
 	default:
-		return update_oper(rp, (struct readopt_view_strings){.len = 1, .strings = (char *[]){arg}});
+		update_oper(rp, (struct readopt_view_strings){.len = 1, .strings = (char *[]){arg}});
+		return;
 	}
 }
 
-static enum readopt_status
+static void
 parse_opt(struct readopt_parser *rp, enum readopt_form form, char **pos)
 {
 	struct readopt_opt *match;
@@ -137,12 +135,12 @@ parse_opt(struct readopt_parser *rp, enum readopt_form form, char **pos)
 
 			if (!match->cont.req && *strpos) {
 				rp->state.grppos = strpos;
-				return update_opt(rp, NULL, match);
+				update_opt(rp, NULL, match);
+			} else {
+				update_opt(rp, *strpos ? strpos : NULL, match);
 			}
-
-			return update_opt(rp, *strpos ? strpos : NULL, match);
 		} else {
-			return READOPT_STATUS_NOTOPT;
+			rp->error = READOPT_ERROR_NOTOPT;
 		}
 	} else {
 		/* match and advance pos to the end of the match */
@@ -151,15 +149,18 @@ parse_opt(struct readopt_parser *rp, enum readopt_form form, char **pos)
 		if (match) {
 			switch (**pos) {
 			case '\0':
-				return update_opt(rp, NULL, match);
+				update_opt(rp, NULL, match);
+				break;
 			case '=':
 				++(*pos);
-				return update_opt(rp, *pos, match);
+				update_opt(rp, *pos, match);
+				break;
 			default:
-				return READOPT_STATUS_NOTOPT;
+				rp->error = READOPT_ERROR_NOTOPT;
+				break;
 			}
 		} else {
-			return READOPT_STATUS_NOTOPT;
+			rp->error = READOPT_ERROR_NOTOPT;
 		}
 	}
 }
@@ -217,26 +218,28 @@ match_finish(struct readopt_parser *rp, char **needle, char *adv, struct readopt
 	return opt;
 }
 
-static enum readopt_status
+static void
 update_opt(struct readopt_parser *rp, char *attach, struct readopt_opt *opt)
 {
 	if (opt->cont.req) {
 		if (attach) {
 			/* --opt=value, --opt=, -ovalue */
 			struct readopt_oper *curr = &rp->state.curr.opt->cont.oper;
-			return occ_opt(rp, opt) == READOPT_STATUS_SUCCESS ? add_val(rp, curr, attach, 0) : READOPT_STATUS_SUCCESS;
+			occ_opt(rp, opt);
+			add_val(rp, curr, attach, 0);
 		} else {
 			/* --opt value, -o value */
 			rp->state.pending = 1;
-			return occ_opt(rp, opt);
+			occ_opt(rp, opt);
 		}
 	} else {
-		enum readopt_status s = occ_opt(rp, opt);
-		return attach ? READOPT_STATUS_NOTREQ : s;
+		occ_opt(rp, opt);
+		if (attach)
+			rp->error = READOPT_ERROR_NOTREQ;
 	}
 }
 
-static enum readopt_status
+static void
 update_oper(struct readopt_parser *rp, struct readopt_view_strings val)
 {
 	assert(val.len && val.strings);
@@ -248,11 +251,9 @@ update_oper(struct readopt_parser *rp, struct readopt_view_strings val)
 		permute_rest(rp->state.curr.eoval, val);
 		rp->state.curr.ioper.len += val.len;
 	}
-
-	return READOPT_STATUS_SUCCESS;
 }
 
-static enum readopt_status
+static void
 assign_opers(struct readopt_parser *rp)
 {
 	size_t count = rp->state.curr.ioper.len;
@@ -264,8 +265,10 @@ assign_opers(struct readopt_parser *rp)
 		nupper += readopt_select_upper(rp->opers[i].bounds);
 	}
 
-	if (count < nlower)
-		return READOPT_STATUS_RANGEOPER;
+	if (count < nlower) {
+		rp->error = READOPT_ERROR_RANGEOPER;
+		return;
+	}
 
 	struct {
 		size_t extra;
@@ -296,19 +299,19 @@ assign_opers(struct readopt_parser *rp)
 		rp->opers[i].val.len += add, rest.extra -= add;
 	}
 
-	return rest.extra || rest.req ? READOPT_STATUS_RANGEOPER : READOPT_STATUS_SUCCESS;
+	if (rest.extra || rest.req)
+		rp->error = READOPT_ERROR_RANGEOPER;
 }
 
-static enum readopt_status
+static void
 add_val(struct readopt_parser *rp, struct readopt_oper *oper, char *string, int end)
 {
 	rp->state.pending = 0;
 
 	if (!readopt_validate_within(oper))
-		return READOPT_STATUS_RANGEOPT;
-
-	permute_val(rp, &oper->val, string, end);
-	return READOPT_STATUS_SUCCESS;
+		rp->error = READOPT_ERROR_RANGEOPT;
+	else
+		permute_val(rp, &oper->val, string, end);
 }
 
 static char *
@@ -322,13 +325,12 @@ skip_incl(const char *inner, char *outer)
 	return !*inner ? outer : NULL;
 }
 
-static enum readopt_status
+static void
 occ_opt(struct readopt_parser *rp, struct readopt_opt *opt)
 {
 	assert(opt);
 	rp->state.curr.opt = opt;
 	++rp->state.curr.opt->cont.oper.val.len;
-	return READOPT_STATUS_SUCCESS;
 }
 
 static void
@@ -349,7 +351,7 @@ permute_val(struct readopt_parser *rp, struct readopt_view_strings *target, char
 
 	char **start = pos, **stop = rp->state.curr.eoval;
 
-	/* increment all value pointers in the operands and options which are between start and stop, inclusive */
+	/* increment all value pointers in the options which are between start and stop, inclusive */
 	for (size_t i = 0; readopt_validate_opt(rp->opts + i); i++)
 		incr_between(start, stop, &rp->opts[i].cont.oper.val, target);
 
@@ -435,16 +437,16 @@ readopt_keyval(char *s)
 }
 
 int
-readopt_put_status(enum readopt_status status, struct readopt_write_context *ctx)
+readopt_put_error(enum readopt_error e, struct readopt_write_context *ctx)
 {
 	const char *s;
-	switch (status) {
-	case READOPT_STATUS_SUCCESS:   s = "Success"; break;
-	case READOPT_STATUS_NOVAL:     s = "Option did not receive its required value"; break;
-	case READOPT_STATUS_NOTREQ:    s = "No value required for option"; break;
-	case READOPT_STATUS_NOTOPT:    s = "Specified option does not exist"; break;
-	case READOPT_STATUS_RANGEOPT:  s = "Option(s) are not within the defined limits"; break;
-	case READOPT_STATUS_RANGEOPER: s = "Operand(s) are not within the defined limits"; break;
+	switch (e) {
+	case READOPT_ERROR_SUCCESS:   s = "Success"; break;
+	case READOPT_ERROR_NOVAL:     s = "Option did not receive its required value"; break;
+	case READOPT_ERROR_NOTREQ:    s = "No value required for option"; break;
+	case READOPT_ERROR_NOTOPT:    s = "Specified option does not exist"; break;
+	case READOPT_ERROR_RANGEOPT:  s = "Option(s) are not within the defined limits"; break;
+	case READOPT_ERROR_RANGEOPER: s = "Operand(s) are not within the defined limits"; break;
 	default:                       return 0;
 	}
 
