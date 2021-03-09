@@ -107,11 +107,13 @@ main(int argc, char **argv)
 		{0}
 	};
 
-	struct readopt_parser rp = readopt_parser_create(
+	struct readopt_parser rp;
+	readopt_parser_init(
+		&rp,
 		opts,
 		opers,
 		(struct readopt_view_strings){
-			.strings = argv + 1,
+			.strings = (const char **)argv + 1,
 			.len = argc - 1
 		}
 	);

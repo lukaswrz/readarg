@@ -3,28 +3,28 @@
 
 #include "readopt.h"
 
-static void parse_arg(struct readopt_parser *rp, char *arg);
+static void parse_arg(struct readopt_parser *rp, const char *arg);
 
-static void parse_opt(struct readopt_parser *rp, enum readopt_form form, char **pos);
+static void parse_opt(struct readopt_parser *rp, enum readopt_form form, const char **pos);
 
-static struct readopt_opt *match_opt(struct readopt_parser *rp, enum readopt_form form, char **needle);
-static struct readopt_opt *match_finish(struct readopt_parser *rp, char **needle, char *cmp, struct readopt_opt *opt);
+static struct readopt_opt *match_opt(struct readopt_parser *rp, enum readopt_form form, const char **needle);
+static struct readopt_opt *match_finish(struct readopt_parser *rp, const char **needle, const char *adv, struct readopt_opt *opt);
 
-static void update_opt(struct readopt_parser *rp, char *attach, struct readopt_opt *opt);
+static void update_opt(struct readopt_parser *rp, const char *attach, struct readopt_opt *opt);
 static void update_oper(struct readopt_parser *rp, struct readopt_view_strings val);
 
 static void assign_opers(struct readopt_parser *rp);
 
-static void add_val(struct readopt_parser *rp, struct readopt_oper *oper, char *str, int end);
+static void add_val(struct readopt_parser *rp, struct readopt_oper *oper, const char *string, int end);
 
-static char *skip_incl(const char *inner, char *outer);
+static const char *skip_incl(const char *outer, const char *inner);
 
 static void occ_opt(struct readopt_parser *rp, struct readopt_opt *opt);
 
 /* permutes the argument list to store a value for an option or operand */
-static void permute_val(struct readopt_parser *rp, struct readopt_view_strings *target, char *val, int end);
-static void incr_between(char **start, char **stop, struct readopt_view_strings *curr, struct readopt_view_strings *exclude);
-static void permute_rest(char **target, struct readopt_view_strings start);
+static void permute_val(struct readopt_parser *rp, struct readopt_view_strings *target, const char *val, int end);
+static void incr_between(const char **start, const char **stop, struct readopt_view_strings *curr, struct readopt_view_strings *exclude);
+static void permute_rest(const char **target, struct readopt_view_strings start);
 
 static void format_usage_opts(struct readopt_format_context *ctx, struct readopt_opt *opts);
 static void format_usage_opers(struct readopt_format_context *ctx, struct readopt_oper *opers);
@@ -68,7 +68,7 @@ readopt_parse(struct readopt_parser *rp)
 }
 
 static void
-parse_arg(struct readopt_parser *rp, char *arg)
+parse_arg(struct readopt_parser *rp, const char *arg)
 {
 	/* parse the next option in the grouped option string, which automatically advances it */
 	if (rp->state.grppos) {
@@ -79,7 +79,7 @@ parse_arg(struct readopt_parser *rp, char *arg)
 		return;
 	}
 
-	char *pos = arg;
+	const char *pos = arg;
 
 	switch (*pos) {
 	case '-':
@@ -110,20 +110,20 @@ parse_arg(struct readopt_parser *rp, char *arg)
 				return;
 			}
 		case '\0':
-			update_oper(rp, (struct readopt_view_strings){.len = 1, .strings = (char *[]){arg}});
+			update_oper(rp, (struct readopt_view_strings){.len = 1, .strings = (const char *[]){arg}});
 			return;
 		default:
 			parse_opt(rp, READOPT_FORM_SHORT, &pos);
 			return;
 		}
 	default:
-		update_oper(rp, (struct readopt_view_strings){.len = 1, .strings = (char *[]){arg}});
+		update_oper(rp, (struct readopt_view_strings){.len = 1, .strings = (const char *[]){arg}});
 		return;
 	}
 }
 
 static void
-parse_opt(struct readopt_parser *rp, enum readopt_form form, char **pos)
+parse_opt(struct readopt_parser *rp, enum readopt_form form, const char **pos)
 {
 	struct readopt_opt *match;
 	assert(form == READOPT_FORM_SHORT || form == READOPT_FORM_LONG);
@@ -131,7 +131,7 @@ parse_opt(struct readopt_parser *rp, enum readopt_form form, char **pos)
 	if (form == READOPT_FORM_SHORT) {
 		match = match_opt(rp, form, pos);
 		if (match) {
-			char *strpos = *pos;
+			const char *strpos = *pos;
 
 			if (!match->cont.req && *strpos) {
 				rp->state.grppos = strpos;
@@ -166,12 +166,12 @@ parse_opt(struct readopt_parser *rp, enum readopt_form form, char **pos)
 }
 
 static struct readopt_opt *
-match_opt(struct readopt_parser *rp, enum readopt_form form, char **needle)
+match_opt(struct readopt_parser *rp, enum readopt_form form, const char **needle)
 {
 	/* structure representing the last, inexact match */
 	struct {
 		/* the current advanced string */
-		char *adv;
+		const char *adv;
 		/* current option */
 		struct readopt_opt *opt;
 	} loose = {0};
@@ -185,11 +185,11 @@ match_opt(struct readopt_parser *rp, enum readopt_form form, char **needle)
 			/* ignore the option as it does not have names in the required form */
 			continue;
 
-		char *cmp = loose.adv;
+		const char *cmp = loose.adv;
 
 		for (size_t j = 0; names[j]; j++) {
 			char *name = names[j];
-			cmp = skip_incl(name, *needle);
+			cmp = skip_incl(*needle, name);
 
 			if (!cmp)
 				continue;
@@ -207,7 +207,7 @@ match_opt(struct readopt_parser *rp, enum readopt_form form, char **needle)
 }
 
 static struct readopt_opt *
-match_finish(struct readopt_parser *rp, char **needle, char *adv, struct readopt_opt *opt)
+match_finish(struct readopt_parser *rp, const char **needle, const char *adv, struct readopt_opt *opt)
 {
 	if (adv)
 		*needle = adv;
@@ -219,7 +219,7 @@ match_finish(struct readopt_parser *rp, char **needle, char *adv, struct readopt
 }
 
 static void
-update_opt(struct readopt_parser *rp, char *attach, struct readopt_opt *opt)
+update_opt(struct readopt_parser *rp, const char *attach, struct readopt_opt *opt)
 {
 	if (opt->cont.req) {
 		if (attach) {
@@ -304,7 +304,7 @@ assign_opers(struct readopt_parser *rp)
 }
 
 static void
-add_val(struct readopt_parser *rp, struct readopt_oper *oper, char *string, int end)
+add_val(struct readopt_parser *rp, struct readopt_oper *oper, const char *string, int end)
 {
 	rp->state.pending = 0;
 
@@ -314,8 +314,8 @@ add_val(struct readopt_parser *rp, struct readopt_oper *oper, char *string, int 
 		permute_val(rp, &oper->val, string, end);
 }
 
-static char *
-skip_incl(const char *inner, char *outer)
+static const char *
+skip_incl(const char *outer, const char *inner)
 {
 	while (*inner == *outer) {
 		if (!*inner)
@@ -334,13 +334,13 @@ occ_opt(struct readopt_parser *rp, struct readopt_opt *opt)
 }
 
 static void
-permute_val(struct readopt_parser *rp, struct readopt_view_strings *target, char *val, int end)
+permute_val(struct readopt_parser *rp, struct readopt_view_strings *target, const char *val, int end)
 {
 	if (!target->strings)
 		/* fallback position when no value has been set yet */
 		target->strings = rp->state.curr.eoval - (end ? 0 : rp->state.curr.ioper.len);
 
-	char **pos = target->strings + (target->len - 1);
+	const char **pos = target->strings + (target->len - 1);
 
 	assert(rp->state.curr.arg >= rp->state.curr.eoval);
 
@@ -349,7 +349,7 @@ permute_val(struct readopt_parser *rp, struct readopt_view_strings *target, char
 	*pos = val;
 	++rp->state.curr.eoval;
 
-	char **start = pos, **stop = rp->state.curr.eoval;
+	const char **start = pos, **stop = rp->state.curr.eoval;
 
 	/* increment all value pointers in the options which are between start and stop, inclusive */
 	for (size_t i = 0; readopt_validate_opt(rp->opts + i); i++)
@@ -359,14 +359,14 @@ permute_val(struct readopt_parser *rp, struct readopt_view_strings *target, char
 }
 
 static void
-incr_between(char **start, char **stop, struct readopt_view_strings *curr, struct readopt_view_strings *exclude)
+incr_between(const char **start, const char **stop, struct readopt_view_strings *curr, struct readopt_view_strings *exclude)
 {
 	if (curr->strings >= start && curr->strings <= stop && curr != exclude)
 		++curr->strings;
 }
 
 static void
-permute_rest(char **target, struct readopt_view_strings start)
+permute_rest(const char **target, struct readopt_view_strings start)
 {
 	memmove(target, start.strings, start.len * sizeof *start.strings);
 }
@@ -383,14 +383,6 @@ readopt_parser_init(struct readopt_parser *rp, struct readopt_opt *opts, struct 
 			.eoval = args.strings
 		}
 	};
-}
-
-struct readopt_parser
-readopt_parser_create(struct readopt_opt *opts, struct readopt_oper *opers, struct readopt_view_strings args)
-{
-	struct readopt_parser rp = {0};
-	readopt_parser_init(&rp, opts, opers, args);
-	return rp;
 }
 
 int

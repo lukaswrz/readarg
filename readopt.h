@@ -24,7 +24,7 @@ enum readopt_format {
 };
 
 struct readopt_view_strings {
-	char **strings;
+	const char **strings;
 	size_t len;
 };
 
@@ -58,13 +58,13 @@ struct readopt_parser {
 	struct readopt_view_strings args;
 	struct {
 		int pending;
-		char *grppos;
+		const char *grppos;
 		struct {
 			struct readopt_opt *opt;
 			/* reference to the current argument being parsed */
-			char **arg;
+			const char **arg;
 			/* reference to the last element of the option/operand value view */
-			char **eoval;
+			const char **eoval;
 			/* intermediate operands which have not yet been assigned */
 			struct readopt_view_strings ioper;
 		} curr;
@@ -105,8 +105,6 @@ struct readopt_format_context {
 int readopt_parse(struct readopt_parser *rp);
 /* args should always exclude the first element, like this: {.strings = argv + 1, .len = argc - 1} */
 void readopt_parser_init(struct readopt_parser *rp, struct readopt_opt *opts, struct readopt_oper *opers, struct readopt_view_strings args);
-/* args should always exclude the first element, like this: {.strings = argv + 1, .len = argc - 1} */
-struct readopt_parser readopt_parser_create(struct readopt_opt *opts, struct readopt_oper *opers, struct readopt_view_strings args);
 /* check whether the argument is a valid option (can be used to check for the end of an array of options) */
 int readopt_validate_opt(struct readopt_opt *opt);
 /* check whether the argument is a valid operand (can be used to check for the end of an array of operands) */
