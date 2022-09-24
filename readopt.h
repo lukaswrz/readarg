@@ -115,18 +115,3 @@ int readopt_validate_within(struct readopt_oper *oper);
 size_t readopt_select_upper(struct readopt_bounds bounds);
 /* get the lower limit (this does not always return the minimum, if e.g. .val is {0, 1} and inf != 0, then 1 will be considered the lower limit as well as the upper limit) */
 size_t readopt_select_lower(struct readopt_bounds bounds);
-/* pass a string like "thing=value" and get "value" back */
-char *readopt_keyval(char *s);
-
-/* write the passed error as a string via ctx */
-int readopt_put_error(enum readopt_error error, struct readopt_write_context *ctx);
-/* write the usage string, either as plaintext or mdoc format */
-void readopt_put_usage(struct readopt_parser *rp, struct readopt_format_context *ctx);
-
-void readopt_write_stream(struct readopt_write_context *ctx);
-void readopt_write_string(struct readopt_write_context *ctx, const char *string);
-void readopt_write_char(struct readopt_write_context *ctx, char ch);
-void readopt_cond_write_string(enum readopt_format desired, struct readopt_format_context *ctx, const char *string);
-void readopt_cond_write_char(enum readopt_format desired, struct readopt_format_context *ctx, char ch);
-void readopt_write_esc_string(struct readopt_format_context *ctx, const char *string);
-void readopt_cond_write_esc_string(enum readopt_format desired, struct readopt_format_context *ctx, const char *string);
