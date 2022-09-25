@@ -5,14 +5,12 @@ AllowShortCaseLabelsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: All
 AllowShortIfStatementsOnASingleLine: false
 AllowShortLoopsOnASingleLine: false
-AlwaysBreakAfterDefinitionReturnType: All
+AlwaysBreakAfterDefinitionReturnType: None
 AlwaysBreakAfterReturnType: None
 BasedOnStyle: LLVM
 BreakBeforeBinaryOperators: None
-BreakBeforeBraces: Linux
-BreakBeforeInheritanceComma: false
-BreakBeforeTernaryOperators: true
 BreakStringLiterals: false
+BreakBeforeBraces: Allman
 ColumnLimit: 0
 IncludeBlocks: Regroup
 IncludeCategories:
@@ -21,7 +19,7 @@ IncludeCategories:
     - Regex: '^".*"$'
       Priority: 2
 IndentCaseLabels: false
-IndentWidth: 8
+IndentWidth: 4
 PointerAlignment: Right
 ReflowComments:  true
 SortIncludes: true
@@ -33,5 +31,3 @@ SpacesInContainerLiterals: true
 SpacesInCStyleCastParentheses: false
 SpacesInParentheses: false
 SpacesInSquareBrackets: false
-TabWidth: 8
-UseTab: ForIndentation
