@@ -90,14 +90,32 @@ int main(int argc, char **argv)
     };
 
     struct readopt_oper opers[] = {
-        {.name = "pattern",
-         .bounds.inf = 1},
-        {.name = "file",
-         .bounds = {
-             .val = {1},
-             .inf = 1}},
-        {.name = "name", .bounds = {.val = {1}, .inf = 1}},
-        {0}};
+        {
+            .name = "pattern",
+            .bounds.inf = 1,
+        },
+        {
+            .name = "file",
+            .bounds = {
+                .val = {
+                    1,
+                },
+                .inf = 1,
+            },
+        },
+        {
+            .name = "name",
+            .bounds = {
+                .val = {
+                    1,
+                },
+                .inf = 1,
+            },
+        },
+        {
+            0,
+        },
+    };
 
     struct readopt_parser rp;
     readopt_parser_init(
