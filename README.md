@@ -1,46 +1,45 @@
 # readopt
 
-## Overview
+## Features
 
-This is an option parsing library.
+* Short options (`-f`)
+  * Short options with a value directly following the option character
+    (`-fvalue`)
+  * Short options with a value as a separate `argv` element (`-f value`)
+  * Grouped short options (`-asdf`, `-asdfvalue`, `-asdf value`)
+* Long options (`--file`)
+  * Long options with a value separated by an equal sign (`--file=value`)
+  * Long options with a value as a separate `argv` element (`--file value`)
+* Multiple values are represented in an array (`-f value1 -f value2 ...`)
+* Operands mixed with options (`-f value1 operand1 -f value2 operand2`)
 
-The following option formats are recognized:
-* `-f`
-* `-fvalue`
-* `-f value`
-* `-asdf` (grouped short options)
-* `-asdfvalue`
-* `-asdf value`
-* `--file`
-* `--file value`
-* `--file=value`
-* `-f value1 -f value2 ...` (multiple values are represented in an array)
-* `-f value1 operand1 -f value2 operand2` (operands intermixed with options)
+## Usage
 
-It permutes `argv` to handle multiple values for each option and to assign
-values to operands.
+Installing this library is as simple as downloading the header file, dropping
+it into your project directory and including it. Alternatively, you could choose
+to use a Git submodule. In any case, attribution is not required.
 
-`mdoc(7)` `SYNOPSIS` sections and plaintext usage messages can be generated as
-well (via `readopt_put_usage`).
+It is required that one file in your project defines the
+`READOPT_IMPLEMENTATION` macro before including the `readopt.h` header file,
+as with any other single-header library.
 
-An example can be found in `test/test.c`.
+An example for how to use readopt can be found in `test/test.c`. If you want to
+see how readopt represents options and operands, execute `test.sh` in the same
+directory.
 
-## Building
+## Terminology
 
-Build and install the library by either using
+If you're wondering what exactly the difference between an option, an operand or
+an argument is, you can skim this document to get a better idea:
+[POSIX Utility Conventions](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap12.html)
 
-```
-$ ninja
-# ninja install
-```
+## Internals
 
-or
+readopt permutes `argv` to handle multiple values for each option and to assign
+values to operands. The advantage of this approach is as follows:
 
-```
-$ make
-# make install
-```
-
-By default, the library will be installed to `/usr/local/lib`, which may not be
-in your library path. You can change this by modifying the `$prefix` in the
-`config.ninja` or by overriding the `$(PREFIX)` variable for the `Makefile`.
+* Allocations are not needed because the memory provided by `argv` is reused
+* It's fairly simple to represent all of this data in an intuitive data
+  structure (in my opinion anyway)
+  * For example, looping through operands is as simple as incrementing
+    `parser.oper` until `readopt_validate_oper` returns `0`.
