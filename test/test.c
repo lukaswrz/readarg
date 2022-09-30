@@ -7,8 +7,8 @@ int main(int argc, char **argv)
     struct readopt_opt opts[] = {
         {
             .names = {
-                [READOPT_FORM_SHORT] = READOPT_ALLOC_STRINGS("e", "x"),
-                [READOPT_FORM_LONG] = READOPT_ALLOC_STRINGS("expr", "expression"),
+                [READOPT_FORM_SHORT] = READOPT_STRINGS("e", "x"),
+                [READOPT_FORM_LONG] = READOPT_STRINGS("expr", "expression"),
             },
             .cont = {
                 .req = 1,
@@ -20,8 +20,8 @@ int main(int argc, char **argv)
         },
         {
             .names = {
-                [READOPT_FORM_SHORT] = READOPT_ALLOC_STRINGS("c"),
-                [READOPT_FORM_LONG] = READOPT_ALLOC_STRINGS("config"),
+                [READOPT_FORM_SHORT] = READOPT_STRINGS("c"),
+                [READOPT_FORM_LONG] = READOPT_STRINGS("config"),
             },
             .cont = {
                 .req = 1,
@@ -35,8 +35,8 @@ int main(int argc, char **argv)
         },
         {
             .names = {
-                [READOPT_FORM_SHORT] = READOPT_ALLOC_STRINGS("i"),
-                [READOPT_FORM_LONG] = READOPT_ALLOC_STRINGS("uri"),
+                [READOPT_FORM_SHORT] = READOPT_STRINGS("i"),
+                [READOPT_FORM_LONG] = READOPT_STRINGS("uri"),
             },
             .cont = {
                 .req = 1,
@@ -45,8 +45,8 @@ int main(int argc, char **argv)
         },
         {
             .names = {
-                [READOPT_FORM_SHORT] = READOPT_ALLOC_STRINGS("b"),
-                [READOPT_FORM_LONG] = READOPT_ALLOC_STRINGS("backup", "backup-file"),
+                [READOPT_FORM_SHORT] = READOPT_STRINGS("b"),
+                [READOPT_FORM_LONG] = READOPT_STRINGS("backup", "backup-file"),
             },
             .cont = {
                 .req = 1,
@@ -55,8 +55,8 @@ int main(int argc, char **argv)
         },
         {
             .names = {
-                [READOPT_FORM_SHORT] = READOPT_ALLOC_STRINGS("v"),
-                [READOPT_FORM_LONG] = READOPT_ALLOC_STRINGS("verbose"),
+                [READOPT_FORM_SHORT] = READOPT_STRINGS("v"),
+                [READOPT_FORM_LONG] = READOPT_STRINGS("verbose"),
             },
             .cont.oper.bounds.val = {
                 3,
@@ -64,14 +64,14 @@ int main(int argc, char **argv)
         },
         {
             .names = {
-                [READOPT_FORM_SHORT] = READOPT_ALLOC_STRINGS("s"),
-                [READOPT_FORM_LONG] = READOPT_ALLOC_STRINGS("sort"),
+                [READOPT_FORM_SHORT] = READOPT_STRINGS("s"),
+                [READOPT_FORM_LONG] = READOPT_STRINGS("sort"),
             },
             .cont.oper.bounds.inf = 1,
         },
         {
             .names = {
-                [READOPT_FORM_LONG] = READOPT_ALLOC_STRINGS("help"),
+                [READOPT_FORM_LONG] = READOPT_STRINGS("help"),
             },
             .cont.oper.bounds.val = {
                 1,
@@ -79,8 +79,8 @@ int main(int argc, char **argv)
         },
         {
             .names = {
-                [READOPT_FORM_SHORT] = READOPT_ALLOC_STRINGS("V"),
-                [READOPT_FORM_LONG] = READOPT_ALLOC_STRINGS("version"),
+                [READOPT_FORM_SHORT] = READOPT_STRINGS("V"),
+                [READOPT_FORM_LONG] = READOPT_STRINGS("version"),
             },
             .cont.oper.bounds.val = {
                 1,

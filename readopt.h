@@ -4,7 +4,7 @@
 
 #include <stdio.h>
 
-#define READOPT_ALLOC_STRINGS(...) ((char *[]){__VA_ARGS__, NULL})
+#define READOPT_STRINGS(...) ((char *[]){__VA_ARGS__, NULL})
 
 enum readopt_error
 {
