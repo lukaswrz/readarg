@@ -6,12 +6,12 @@
 
 enum readarg_error
 {
-    READARG_ERROR_SUCCESS,
-    READARG_ERROR_NOVAL,
-    READARG_ERROR_NOTREQ,
-    READARG_ERROR_NOTOPT,
-    READARG_ERROR_RANGEOPT,
-    READARG_ERROR_RANGEOPER
+    READARG_ESUCCESS,
+    READARG_ENOVAL,
+    READARG_ENOTREQ,
+    READARG_ENOTOPT,
+    READARG_ERANGEOPT,
+    READARG_ERANGEOPER
 };
 
 enum readarg_form
@@ -39,7 +39,8 @@ struct readarg_bounds
     int inf;
 };
 
-struct readarg_oper
+/* An argument in this case may either be an option argument or an operand. */
+struct readarg_arg
 {
     char *name;
     struct readarg_bounds bounds;
@@ -51,19 +52,15 @@ struct readarg_opt
     /* Two null-terminated arrays of either long or short option names. */
     char **names[2];
 
-    struct
-    {
-        int req;
+    int req;
 
-        /* oper.name is the name of the value itself (not the option). */
-        struct readarg_oper oper;
-    } cont;
+    struct readarg_arg arg;
 };
 
 struct readarg_parser
 {
     struct readarg_opt *opts;
-    struct readarg_oper *opers;
+    struct readarg_arg *opers;
     struct readarg_view_strings args;
     struct
     {
@@ -86,13 +83,13 @@ struct readarg_parser
 /* Iteratively parse the arguments. */
 int readarg_parse(struct readarg_parser *rp);
 /* args should always exclude the first element. */
-void readarg_parser_init(struct readarg_parser *rp, struct readarg_opt *opts, struct readarg_oper *opers, struct readarg_view_strings args);
-/* Check whether the argument is a valid option (can be used to check for the end of an array of options). */
+void readarg_parser_init(struct readarg_parser *rp, struct readarg_opt *opts, struct readarg_arg *opers, struct readarg_view_strings args);
+/* Check whether the argument is a valid option. */
 int readarg_validate_opt(struct readarg_opt *opt);
-/* Check whether the argument is a valid operand (can be used to check for the end of an array of operands). */
-int readarg_validate_oper(struct readarg_oper *oper);
-/* Check whether the operand's values are within the defined limits. */
-int readarg_validate_within(struct readarg_oper *oper);
+/* Check whether the argument is a valid argument. */
+int readarg_validate_arg(struct readarg_arg *arg);
+/* Check whether the argument's values are within the defined limits. */
+int readarg_validate_within(struct readarg_arg *arg);
 /* Get the upper limit. */
 size_t readarg_select_upper(struct readarg_bounds bounds);
 /* Get the lower limit. This does not always return the minimum. */
@@ -115,7 +112,7 @@ static void readarg_update_oper(struct readarg_parser *rp, struct readarg_view_s
 
 static void readarg_assign_opers(struct readarg_parser *rp);
 
-static void readarg_add_val(struct readarg_parser *rp, struct readarg_oper *oper, const char *string, int end);
+static void readarg_add_val(struct readarg_parser *rp, struct readarg_arg *arg, const char *string, int end);
 
 static const char *readarg_skip_incl(const char *outer, const char *inner);
 
@@ -134,15 +131,15 @@ int readarg_parse(struct readarg_parser *rp)
         if (rp->state.pending)
         {
             /* The last specified option required an argument, but no argument has been provided. */
-            rp->error = READARG_ERROR_NOVAL;
+            rp->error = READARG_ENOVAL;
             return 0;
         }
 
         for (size_t i = 0; readarg_validate_opt(rp->opts + i); i++)
         {
-            if (!readarg_validate_within(&rp->opts[i].cont.oper))
+            if (!readarg_validate_within(&rp->opts[i].arg))
             {
-                rp->error = READARG_ERROR_RANGEOPT;
+                rp->error = READARG_ERANGEOPT;
                 return 0;
             }
         }
@@ -153,7 +150,7 @@ int readarg_parse(struct readarg_parser *rp)
 
     if (rp->state.pending)
     {
-        readarg_add_val(rp, &rp->state.curr.opt->cont.oper, *rp->state.curr.arg, 0);
+        readarg_add_val(rp, &rp->state.curr.opt->arg, *rp->state.curr.arg, 0);
         ++rp->state.curr.arg;
         return !rp->error;
     }
@@ -204,8 +201,9 @@ static void readarg_parse_arg(struct readarg_parser *rp, const char *arg)
                 }
 
                 readarg_update_oper(rp, (struct readarg_view_strings){
-                                    .len = off - 1,
-                                    .strings = rp->state.curr.arg + 1});
+                                            .len = off - 1,
+                                            .strings = rp->state.curr.arg + 1,
+                                        });
                 rp->state.curr.arg = rp->args.strings + rp->args.len - 1;
 
                 return;
@@ -238,7 +236,7 @@ static void readarg_parse_opt(struct readarg_parser *rp, enum readarg_form form,
         {
             const char *strpos = *pos;
 
-            if (!match->cont.req && *strpos)
+            if (!match->req && *strpos)
             {
                 rp->state.grppos = strpos;
                 readarg_update_opt(rp, NULL, match);
@@ -250,7 +248,7 @@ static void readarg_parse_opt(struct readarg_parser *rp, enum readarg_form form,
         }
         else
         {
-            rp->error = READARG_ERROR_NOTOPT;
+            rp->error = READARG_ENOTOPT;
         }
     }
     else
@@ -270,13 +268,13 @@ static void readarg_parse_opt(struct readarg_parser *rp, enum readarg_form form,
                 readarg_update_opt(rp, *pos, match);
                 break;
             default:
-                rp->error = READARG_ERROR_NOTOPT;
+                rp->error = READARG_ENOTOPT;
                 break;
             }
         }
         else
         {
-            rp->error = READARG_ERROR_NOTOPT;
+            rp->error = READARG_ENOTOPT;
         }
     }
 }
@@ -337,12 +335,12 @@ static struct readarg_opt *readarg_match_finish(struct readarg_parser *rp, const
 
 static void readarg_update_opt(struct readarg_parser *rp, const char *attach, struct readarg_opt *opt)
 {
-    if (opt->cont.req)
+    if (opt->req)
     {
         if (attach)
         {
             /* --opt=value, --opt=, -ovalue */
-            struct readarg_oper *curr = &rp->state.curr.opt->cont.oper;
+            struct readarg_arg *curr = &rp->state.curr.opt->arg;
             readarg_occ_opt(rp, opt);
             readarg_add_val(rp, curr, attach, 0);
         }
@@ -357,7 +355,7 @@ static void readarg_update_opt(struct readarg_parser *rp, const char *attach, st
     {
         readarg_occ_opt(rp, opt);
         if (attach)
-            rp->error = READARG_ERROR_NOTREQ;
+            rp->error = READARG_ENOTREQ;
     }
 }
 
@@ -383,7 +381,7 @@ static void readarg_assign_opers(struct readarg_parser *rp)
 
     size_t nlower = 0;
     size_t nupper = 0;
-    for (size_t i = 0; readarg_validate_oper(rp->opers + i); i++)
+    for (size_t i = 0; readarg_validate_arg(rp->opers + i); i++)
     {
         nlower += readarg_select_lower(rp->opers[i].bounds);
         nupper += readarg_select_upper(rp->opers[i].bounds);
@@ -391,7 +389,7 @@ static void readarg_assign_opers(struct readarg_parser *rp)
 
     if (count < nlower)
     {
-        rp->error = READARG_ERROR_RANGEOPER;
+        rp->error = READARG_ERANGEOPER;
         return;
     }
 
@@ -403,7 +401,7 @@ static void readarg_assign_opers(struct readarg_parser *rp)
         count - nlower,
         nlower};
 
-    for (size_t i = 0; readarg_validate_oper(rp->opers + i); i++)
+    for (size_t i = 0; readarg_validate_arg(rp->opers + i); i++)
     {
         if (count == 0 || !rp->opers[i].val.strings)
         {
@@ -428,17 +426,17 @@ static void readarg_assign_opers(struct readarg_parser *rp)
     }
 
     if (rest.extra || rest.req)
-        rp->error = READARG_ERROR_RANGEOPER;
+        rp->error = READARG_ERANGEOPER;
 }
 
-static void readarg_add_val(struct readarg_parser *rp, struct readarg_oper *oper, const char *string, int end)
+static void readarg_add_val(struct readarg_parser *rp, struct readarg_arg *arg, const char *string, int end)
 {
     rp->state.pending = 0;
 
-    if (!readarg_validate_within(oper))
-        rp->error = READARG_ERROR_RANGEOPT;
+    if (!readarg_validate_within(arg))
+        rp->error = READARG_ERANGEOPT;
     else
-        readarg_permute_val(rp, &oper->val, string, end);
+        readarg_permute_val(rp, &arg->val, string, end);
 }
 
 static const char *readarg_skip_incl(const char *outer, const char *inner)
@@ -456,7 +454,7 @@ static void readarg_occ_opt(struct readarg_parser *rp, struct readarg_opt *opt)
 {
     assert(opt);
     rp->state.curr.opt = opt;
-    ++rp->state.curr.opt->cont.oper.val.len;
+    ++rp->state.curr.opt->arg.val.len;
 }
 
 static void readarg_permute_val(struct readarg_parser *rp, struct readarg_view_strings *target, const char *val, int end)
@@ -478,7 +476,7 @@ static void readarg_permute_val(struct readarg_parser *rp, struct readarg_view_s
 
     /* Increment all value pointers in the options which are between start and stop (inclusive). */
     for (size_t i = 0; readarg_validate_opt(rp->opts + i); i++)
-        readarg_incr_between(start, stop, &rp->opts[i].cont.oper.val, target);
+        readarg_incr_between(start, stop, &rp->opts[i].arg.val, target);
 
     readarg_incr_between(start, stop, &rp->state.curr.ioper, target);
 }
@@ -494,7 +492,7 @@ static void readarg_permute_rest(const char **target, struct readarg_view_string
     memmove(target, start.strings, start.len * sizeof *start.strings);
 }
 
-void readarg_parser_init(struct readarg_parser *rp, struct readarg_opt *opts, struct readarg_oper *opers, struct readarg_view_strings args)
+void readarg_parser_init(struct readarg_parser *rp, struct readarg_opt *opts, struct readarg_arg *opers, struct readarg_view_strings args)
 {
     *rp = (struct readarg_parser){
         .args = args,
@@ -502,7 +500,9 @@ void readarg_parser_init(struct readarg_parser *rp, struct readarg_opt *opts, st
         .opers = opers,
         .state.curr = {
             .arg = args.strings,
-            .eoval = args.strings}};
+            .eoval = args.strings,
+        },
+    };
 }
 
 int readarg_validate_opt(struct readarg_opt *opt)
@@ -511,18 +511,18 @@ int readarg_validate_opt(struct readarg_opt *opt)
     return opt->names[0] || opt->names[1];
 }
 
-int readarg_validate_oper(struct readarg_oper *oper)
+int readarg_validate_arg(struct readarg_arg *arg)
 {
-    assert(oper);
-    return !!oper->name;
+    assert(arg);
+    return !!arg->name;
 }
 
-int readarg_validate_within(struct readarg_oper *oper)
+int readarg_validate_within(struct readarg_arg *arg)
 {
-    size_t occ = oper->val.len;
-    size_t upper = readarg_select_upper(oper->bounds);
-    size_t lower = readarg_select_lower(oper->bounds);
-    return occ >= lower && (occ <= upper || oper->bounds.inf);
+    size_t occ = arg->val.len;
+    size_t upper = readarg_select_upper(arg->bounds);
+    size_t lower = readarg_select_lower(arg->bounds);
+    return occ >= lower && (occ <= upper || arg->bounds.inf);
 }
 
 size_t readarg_select_upper(struct readarg_bounds bounds)

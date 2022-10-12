@@ -10,12 +10,10 @@ int main(int argc, char **argv)
                 [READARG_FORM_SHORT] = READARG_STRINGS("e", "x"),
                 [READARG_FORM_LONG] = READARG_STRINGS("expr", "expression"),
             },
-            .cont = {
-                .req = 1,
-                .oper.bounds.val = {
-                    1,
-                    4,
-                },
+            .req = 1,
+            .arg.bounds.val = {
+                1,
+                4,
             },
         },
         {
@@ -23,13 +21,11 @@ int main(int argc, char **argv)
                 [READARG_FORM_SHORT] = READARG_STRINGS("c"),
                 [READARG_FORM_LONG] = READARG_STRINGS("config"),
             },
-            .cont = {
-                .req = 1,
-                .oper = {
-                    .name = "file",
-                    .bounds.val = {
-                        2,
-                    },
+            .req = 1,
+            .arg = {
+                .name = "file",
+                .bounds.val = {
+                    2,
                 },
             },
         },
@@ -38,27 +34,23 @@ int main(int argc, char **argv)
                 [READARG_FORM_SHORT] = READARG_STRINGS("i"),
                 [READARG_FORM_LONG] = READARG_STRINGS("uri"),
             },
-            .cont = {
-                .req = 1,
-                .oper.bounds.inf = 1,
-            },
+            .req = 1,
+            .arg.bounds.inf = 1,
         },
         {
             .names = {
                 [READARG_FORM_SHORT] = READARG_STRINGS("b"),
                 [READARG_FORM_LONG] = READARG_STRINGS("backup", "backup-file"),
             },
-            .cont = {
-                .req = 1,
-                .oper.bounds.inf = 1,
-            },
+            .req = 1,
+            .arg.bounds.inf = 1,
         },
         {
             .names = {
                 [READARG_FORM_SHORT] = READARG_STRINGS("v"),
                 [READARG_FORM_LONG] = READARG_STRINGS("verbose"),
             },
-            .cont.oper.bounds.val = {
+            .arg.bounds.val = {
                 3,
             },
         },
@@ -67,13 +59,13 @@ int main(int argc, char **argv)
                 [READARG_FORM_SHORT] = READARG_STRINGS("s"),
                 [READARG_FORM_LONG] = READARG_STRINGS("sort"),
             },
-            .cont.oper.bounds.inf = 1,
+            .arg.bounds.inf = 1,
         },
         {
             .names = {
                 [READARG_FORM_LONG] = READARG_STRINGS("help"),
             },
-            .cont.oper.bounds.val = {
+            .arg.bounds.val = {
                 1,
             },
         },
@@ -82,14 +74,16 @@ int main(int argc, char **argv)
                 [READARG_FORM_SHORT] = READARG_STRINGS("V"),
                 [READARG_FORM_LONG] = READARG_STRINGS("version"),
             },
-            .cont.oper.bounds.val = {
+            .arg.bounds.val = {
                 1,
             },
         },
-        {0},
+        {
+            0,
+        },
     };
 
-    struct readarg_oper opers[] = {
+    struct readarg_arg opers[] = {
         {
             .name = "pattern",
             .bounds.inf = 1,
@@ -130,7 +124,7 @@ int main(int argc, char **argv)
         ;
 
     fprintf(stderr, "error: %d\n", rp.error);
-    if (rp.error != READARG_ERROR_SUCCESS)
+    if (rp.error != READARG_ESUCCESS)
     {
         return 1;
     }
@@ -150,10 +144,10 @@ int main(int argc, char **argv)
                     }
                 }
             }
-            printf("{ [%zu] ", curr[i].cont.oper.val.len);
-            if (curr[i].cont.req)
+            printf("{ [%zu] ", curr[i].arg.val.len);
+            if (curr[i].req)
             {
-                struct readarg_view_strings val = curr[i].cont.oper.val;
+                struct readarg_view_strings val = curr[i].arg.val;
                 for (size_t j = 0; j < val.len; j++)
                 {
                     printf("%s ", val.strings[j]);
@@ -165,8 +159,8 @@ int main(int argc, char **argv)
 
     printf("oper:\n");
     {
-        struct readarg_oper *curr = rp.opers;
-        for (size_t i = 0; readarg_validate_oper(curr + i); i++)
+        struct readarg_arg *curr = rp.opers;
+        for (size_t i = 0; readarg_validate_arg(curr + i); i++)
         {
             printf("%s { [%zu] ", curr[i].name, curr[i].val.len);
             for (size_t j = 0; j < curr[i].val.len; j++)
