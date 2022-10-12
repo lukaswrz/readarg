@@ -1,14 +1,14 @@
-#define READOPT_IMPLEMENTATION
+#define READARG_IMPLEMENTATION
 
-#include "../readopt.h"
+#include "../readarg.h"
 
 int main(int argc, char **argv)
 {
-    struct readopt_opt opts[] = {
+    struct readarg_opt opts[] = {
         {
             .names = {
-                [READOPT_FORM_SHORT] = READOPT_STRINGS("e", "x"),
-                [READOPT_FORM_LONG] = READOPT_STRINGS("expr", "expression"),
+                [READARG_FORM_SHORT] = READARG_STRINGS("e", "x"),
+                [READARG_FORM_LONG] = READARG_STRINGS("expr", "expression"),
             },
             .cont = {
                 .req = 1,
@@ -20,8 +20,8 @@ int main(int argc, char **argv)
         },
         {
             .names = {
-                [READOPT_FORM_SHORT] = READOPT_STRINGS("c"),
-                [READOPT_FORM_LONG] = READOPT_STRINGS("config"),
+                [READARG_FORM_SHORT] = READARG_STRINGS("c"),
+                [READARG_FORM_LONG] = READARG_STRINGS("config"),
             },
             .cont = {
                 .req = 1,
@@ -35,8 +35,8 @@ int main(int argc, char **argv)
         },
         {
             .names = {
-                [READOPT_FORM_SHORT] = READOPT_STRINGS("i"),
-                [READOPT_FORM_LONG] = READOPT_STRINGS("uri"),
+                [READARG_FORM_SHORT] = READARG_STRINGS("i"),
+                [READARG_FORM_LONG] = READARG_STRINGS("uri"),
             },
             .cont = {
                 .req = 1,
@@ -45,8 +45,8 @@ int main(int argc, char **argv)
         },
         {
             .names = {
-                [READOPT_FORM_SHORT] = READOPT_STRINGS("b"),
-                [READOPT_FORM_LONG] = READOPT_STRINGS("backup", "backup-file"),
+                [READARG_FORM_SHORT] = READARG_STRINGS("b"),
+                [READARG_FORM_LONG] = READARG_STRINGS("backup", "backup-file"),
             },
             .cont = {
                 .req = 1,
@@ -55,8 +55,8 @@ int main(int argc, char **argv)
         },
         {
             .names = {
-                [READOPT_FORM_SHORT] = READOPT_STRINGS("v"),
-                [READOPT_FORM_LONG] = READOPT_STRINGS("verbose"),
+                [READARG_FORM_SHORT] = READARG_STRINGS("v"),
+                [READARG_FORM_LONG] = READARG_STRINGS("verbose"),
             },
             .cont.oper.bounds.val = {
                 3,
@@ -64,14 +64,14 @@ int main(int argc, char **argv)
         },
         {
             .names = {
-                [READOPT_FORM_SHORT] = READOPT_STRINGS("s"),
-                [READOPT_FORM_LONG] = READOPT_STRINGS("sort"),
+                [READARG_FORM_SHORT] = READARG_STRINGS("s"),
+                [READARG_FORM_LONG] = READARG_STRINGS("sort"),
             },
             .cont.oper.bounds.inf = 1,
         },
         {
             .names = {
-                [READOPT_FORM_LONG] = READOPT_STRINGS("help"),
+                [READARG_FORM_LONG] = READARG_STRINGS("help"),
             },
             .cont.oper.bounds.val = {
                 1,
@@ -79,8 +79,8 @@ int main(int argc, char **argv)
         },
         {
             .names = {
-                [READOPT_FORM_SHORT] = READOPT_STRINGS("V"),
-                [READOPT_FORM_LONG] = READOPT_STRINGS("version"),
+                [READARG_FORM_SHORT] = READARG_STRINGS("V"),
+                [READARG_FORM_LONG] = READARG_STRINGS("version"),
             },
             .cont.oper.bounds.val = {
                 1,
@@ -89,7 +89,7 @@ int main(int argc, char **argv)
         {0},
     };
 
-    struct readopt_oper opers[] = {
+    struct readarg_oper opers[] = {
         {
             .name = "pattern",
             .bounds.inf = 1,
@@ -117,28 +117,28 @@ int main(int argc, char **argv)
         },
     };
 
-    struct readopt_parser rp;
-    readopt_parser_init(
+    struct readarg_parser rp;
+    readarg_parser_init(
         &rp,
         opts,
         opers,
-        (struct readopt_view_strings){
+        (struct readarg_view_strings){
             .strings = (const char **)argv + 1,
             .len = argc - 1});
 
-    while (readopt_parse(&rp))
+    while (readarg_parse(&rp))
         ;
 
     fprintf(stderr, "error: %d\n", rp.error);
-    if (rp.error != READOPT_ERROR_SUCCESS)
+    if (rp.error != READARG_ERROR_SUCCESS)
     {
         return 1;
     }
 
     printf("opt:\n");
     {
-        struct readopt_opt *curr = rp.opts;
-        for (size_t i = 0; readopt_validate_opt(curr + i); i++)
+        struct readarg_opt *curr = rp.opts;
+        for (size_t i = 0; readarg_validate_opt(curr + i); i++)
         {
             for (size_t j = 0; j < sizeof curr[i].names / sizeof *curr[i].names; j++)
             {
@@ -153,7 +153,7 @@ int main(int argc, char **argv)
             printf("{ [%zu] ", curr[i].cont.oper.val.len);
             if (curr[i].cont.req)
             {
-                struct readopt_view_strings val = curr[i].cont.oper.val;
+                struct readarg_view_strings val = curr[i].cont.oper.val;
                 for (size_t j = 0; j < val.len; j++)
                 {
                     printf("%s ", val.strings[j]);
@@ -165,8 +165,8 @@ int main(int argc, char **argv)
 
     printf("oper:\n");
     {
-        struct readopt_oper *curr = rp.opers;
-        for (size_t i = 0; readopt_validate_oper(curr + i); i++)
+        struct readarg_oper *curr = rp.opers;
+        for (size_t i = 0; readarg_validate_oper(curr + i); i++)
         {
             printf("%s { [%zu] ", curr[i].name, curr[i].val.len);
             for (size_t j = 0; j < curr[i].val.len; j++)

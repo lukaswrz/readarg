@@ -1,4 +1,4 @@
-# readopt
+# readarg
 
 ## Features
 
@@ -20,11 +20,11 @@ it into your project directory and including it. Alternatively, you could choose
 to use a Git submodule. In any case, attribution is not required.
 
 It is required that one file in your project defines the
-`READOPT_IMPLEMENTATION` macro before including the `readopt.h` header file,
+`READARG_IMPLEMENTATION` macro before including the `readarg.h` header file,
 as with any other single-header library.
 
-An example for how to use readopt can be found in `test/test.c`. If you want to
-see how readopt represents options and operands, execute `test.sh` in the same
+An example for how to use readarg can be found in `test/test.c`. If you want to
+see how readarg represents options and operands, execute `test.sh` in the same
 directory.
 
 ## Terminology
@@ -35,11 +35,11 @@ an argument is, you can skim this document to get a better idea:
 
 ## Internals
 
-readopt permutes `argv` to handle multiple values for each option and to assign
+readarg permutes `argv` to handle multiple values for each option and to assign
 values to operands. The advantage of this approach is as follows:
 
 * Allocations are not needed because the memory provided by `argv` is reused
 * It's fairly simple to represent all of this data in an intuitive data
   structure (in my opinion anyway)
   * For example, looping through operands is as simple as incrementing
-    `parser.oper` until `readopt_validate_oper` returns `0`.
+    `parser.oper` until `readarg_validate_oper` returns `0`.
