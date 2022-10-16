@@ -20,12 +20,6 @@ enum readarg_form
     READARG_FORM_LONG
 };
 
-enum readarg_format
-{
-    READARG_FORMAT_PLAIN,
-    READARG_FORMAT_MDOC,
-};
-
 struct readarg_view_strings
 {
     const char **strings;
