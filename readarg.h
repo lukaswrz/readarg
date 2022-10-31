@@ -1,6 +1,6 @@
 #pragma once
 
-#include <stdio.h>
+#include <stddef.h>
 
 #define READARG_STRINGS(...) ((char *[]){__VA_ARGS__, NULL})
 
@@ -90,6 +90,11 @@ size_t readarg_select_upper(struct readarg_bounds bounds);
 size_t readarg_select_lower(struct readarg_bounds bounds);
 
 #ifdef READARG_IMPLEMENTATION
+
+#ifdef READARG_DEBUG
+#pragma push_macro("NDEBUG")
+#undef NDEBUG
+#endif
 
 #include <assert.h>
 #include <string.h>
@@ -393,7 +398,8 @@ static void readarg_assign_opers(struct readarg_parser *rp)
         size_t req;
     } rest = {
         count - nlower,
-        nlower};
+        nlower,
+    };
 
     for (size_t i = 0; readarg_validate_arg(rp->opers + i); i++)
     {
@@ -529,5 +535,9 @@ size_t readarg_select_lower(struct readarg_bounds bounds)
     return bounds.inf ? readarg_select_upper(bounds) : bounds.val[0] < bounds.val[1] ? bounds.val[0]
                                                                                      : bounds.val[1];
 }
+
+#ifdef READARG_DEBUG
+#pragma pop_macro("NDEBUG")
+#endif
 
 #endif

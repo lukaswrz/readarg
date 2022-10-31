@@ -1,6 +1,9 @@
 #define READARG_IMPLEMENTATION
+#define READARG_DEBUG
 
 #include "../readarg.h"
+
+#include <stdio.h>
 
 int main(int argc, char **argv)
 {
