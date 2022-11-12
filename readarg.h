@@ -74,6 +74,19 @@ struct readarg_parser
     enum readarg_error error;
 };
 
+enum readarg_helpgen_format
+{
+    READARG_HELPGEN_FORMAT_PLAIN,
+    READARG_HELPGEN_FORMAT_MDOC,
+};
+
+struct readarg_helpgen_writer
+{
+    /* A falsy return value should indicate to the caller that an error occured. */
+    int (*write)(void *ctx, const char *buf, size_t len);
+    void *ctx;
+};
+
 /* Iteratively parse the arguments. */
 int readarg_parse(struct readarg_parser *rp);
 /* args should always exclude the first element. */
@@ -88,6 +101,7 @@ int readarg_validate_within(struct readarg_arg *arg);
 size_t readarg_select_upper(struct readarg_bounds bounds);
 /* Get the lower limit. This does not always return the minimum. */
 size_t readarg_select_lower(struct readarg_bounds bounds);
+int readarg_helpgen_put_usage(struct readarg_parser *rp, struct readarg_helpgen_writer *writer, const char *progname, const char *usage);
 
 #ifdef READARG_IMPLEMENTATION
 
@@ -534,6 +548,188 @@ size_t readarg_select_lower(struct readarg_bounds bounds)
 {
     return bounds.inf ? readarg_select_upper(bounds) : bounds.val[0] < bounds.val[1] ? bounds.val[0]
                                                                                      : bounds.val[1];
+}
+
+#define READARG_HELPGEN_TRY(writer, buf, len)                                  \
+    do                                                                         \
+    {                                                                          \
+        int readarg_helpgen_rv = (writer)->write((writer)->ctx, (buf), (len)); \
+        if (!readarg_helpgen_rv)                                               \
+            return readarg_helpgen_rv;                                         \
+    } while (0)
+#define READARG_HELPGEN_TRY_LIT(writer, s) READARG_HELPGEN_TRY((writer), (s), (sizeof(s) - 1))
+#define READARG_HELPGEN_TRY_STR(writer, s) READARG_HELPGEN_TRY((writer), (s), (strlen((s))))
+
+int readarg_helpgen_put_usage(struct readarg_parser *rp, struct readarg_helpgen_writer *writer, const char *progname, const char *usage)
+{
+    READARG_HELPGEN_TRY_STR(writer, usage);
+    READARG_HELPGEN_TRY_LIT(writer, ":\n");
+
+    READARG_HELPGEN_TRY_STR(writer, progname);
+    READARG_HELPGEN_TRY_LIT(writer, "\n");
+
+    int optwritten = 0, operwritten = 0;
+    int nxvalid;
+
+    struct readarg_opt *opts = rp->opts;
+    nxvalid = readarg_validate_opt(opts);
+    for (size_t i = 0; nxvalid; i++)
+    {
+        optwritten = 1;
+
+        if (i == 0)
+        {
+            READARG_HELPGEN_TRY_LIT(writer, "  ");
+        }
+
+        nxvalid = readarg_validate_opt(opts + i + 1);
+        size_t lower = readarg_select_lower(opts[i].arg.bounds);
+        size_t upper = readarg_select_upper(opts[i].arg.bounds);
+        int inf = opts[i].arg.bounds.inf;
+        size_t nforms = sizeof opts[i].names / sizeof *opts[i].names;
+
+        for (size_t j = 0; j < (upper ? upper : !!inf); j++)
+        {
+            if (j >= lower)
+            {
+                READARG_HELPGEN_TRY_LIT(writer, "[");
+            }
+
+            for (size_t k = 0; k < nforms; k++)
+            {
+                int grp = 0;
+                if (opts[i].names[k])
+                {
+                    for (size_t l = 0; opts[i].names[k][l]; l++)
+                    {
+                        if (!grp)
+                        {
+                            if (k == READARG_FORM_SHORT)
+                            {
+                                READARG_HELPGEN_TRY_LIT(writer, "-");
+                            }
+
+                            if (k == READARG_FORM_LONG)
+                            {
+                                READARG_HELPGEN_TRY_LIT(writer, "--");
+                            }
+                        }
+
+                        READARG_HELPGEN_TRY_STR(writer, opts[i].names[k][l]);
+
+                        if (k == READARG_FORM_SHORT)
+                        {
+                            grp = 1;
+                            if (!opts[i].names[k][l + 1])
+                            {
+                                READARG_HELPGEN_TRY_LIT(writer, ", ");
+                            }
+                            continue;
+                        }
+                        else if (k + 1 < nforms || opts[i].names[k][l + 1])
+                        {
+                            READARG_HELPGEN_TRY_LIT(writer, ", ");
+                        }
+                        else
+                        {
+                            if (opts[i].req)
+                            {
+                                READARG_HELPGEN_TRY_LIT(writer, " ");
+                                if (opts[i].arg.name)
+                                {
+                                    READARG_HELPGEN_TRY_STR(writer, opts[i].arg.name);
+                                }
+                                else
+                                {
+                                    READARG_HELPGEN_TRY_LIT(writer, "value");
+                                }
+
+                                if (inf)
+                                {
+                                    READARG_HELPGEN_TRY_LIT(writer, "...");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (j >= lower)
+            {
+                READARG_HELPGEN_TRY_LIT(writer, "]");
+            }
+
+            if (nxvalid)
+            {
+                READARG_HELPGEN_TRY_LIT(writer, "\n  ");
+            }
+        }
+    }
+
+    if (optwritten)
+    {
+        READARG_HELPGEN_TRY_LIT(writer, "\n");
+    }
+
+    struct readarg_arg *opers = rp->opers;
+    nxvalid = readarg_validate_arg(opers);
+    for (size_t i = 0; nxvalid; i++)
+    {
+        operwritten = 1;
+
+        if (i == 0)
+        {
+            READARG_HELPGEN_TRY_LIT(writer, "  ");
+        }
+
+        nxvalid = readarg_validate_arg(opers + i + 1);
+        size_t lower = readarg_select_lower(opers[i].bounds);
+        size_t upper = readarg_select_upper(opers[i].bounds);
+        int inf = opers[i].bounds.inf;
+
+        for (size_t j = 0; j < lower; j++)
+        {
+            READARG_HELPGEN_TRY_STR(writer, opers[i].name);
+
+            if (inf && j + 1 == lower)
+            {
+                READARG_HELPGEN_TRY_LIT(writer, "...");
+            }
+
+            if (nxvalid)
+            {
+                READARG_HELPGEN_TRY_LIT(writer, "\n  ");
+            }
+        }
+
+        size_t amt = upper ? upper : inf ? lower + 1
+                                         : 0;
+        for (size_t j = lower; j < amt; j++)
+        {
+            READARG_HELPGEN_TRY_LIT(writer, "[");
+
+            READARG_HELPGEN_TRY_STR(writer, opers[i].name);
+
+            if (inf && j + 1 == amt)
+            {
+                READARG_HELPGEN_TRY_LIT(writer, "...");
+            }
+
+            READARG_HELPGEN_TRY_LIT(writer, "]");
+
+            if (nxvalid)
+            {
+                READARG_HELPGEN_TRY_LIT(writer, "\n  ");
+            }
+        }
+    }
+
+    if (operwritten)
+    {
+        READARG_HELPGEN_TRY_LIT(writer, "\n");
+    }
+
+    return 1;
 }
 
 #ifdef READARG_DEBUG

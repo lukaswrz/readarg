@@ -1,13 +1,38 @@
 #define READARG_IMPLEMENTATION
 #define READARG_DEBUG
 
+#include <stdio.h>
+
 #include "../readarg.h"
 
-#include <stdio.h>
+enum opt
+{
+    OPT_HELP,
+    OPT_VERSION,
+};
+
+static int write_callback(void *ctx, const char *buf, size_t len);
 
 int main(int argc, char **argv)
 {
     struct readarg_opt opts[] = {
+        [OPT_HELP] = {
+            .names = {
+                [READARG_FORM_LONG] = READARG_STRINGS("help"),
+            },
+            .arg.bounds.val = {
+                1,
+            },
+        },
+        [OPT_VERSION] = {
+            .names = {
+                [READARG_FORM_SHORT] = READARG_STRINGS("V"),
+                [READARG_FORM_LONG] = READARG_STRINGS("version"),
+            },
+            .arg.bounds.val = {
+                1,
+            },
+        },
         {
             .names = {
                 [READARG_FORM_SHORT] = READARG_STRINGS("e", "x"),
@@ -65,23 +90,6 @@ int main(int argc, char **argv)
             .arg.bounds.inf = 1,
         },
         {
-            .names = {
-                [READARG_FORM_LONG] = READARG_STRINGS("help"),
-            },
-            .arg.bounds.val = {
-                1,
-            },
-        },
-        {
-            .names = {
-                [READARG_FORM_SHORT] = READARG_STRINGS("V"),
-                [READARG_FORM_LONG] = READARG_STRINGS("version"),
-            },
-            .arg.bounds.val = {
-                1,
-            },
-        },
-        {
             0,
         },
     };
@@ -121,15 +129,35 @@ int main(int argc, char **argv)
         opers,
         (struct readarg_view_strings){
             .strings = (const char **)argv + 1,
-            .len = argc - 1});
+            .len = argc - 1,
+        });
 
     while (readarg_parse(&rp))
         ;
 
-    fprintf(stderr, "error: %d\n", rp.error);
+    const char *progname = argv[0] == NULL ? "test" : argv[0];
+    struct readarg_helpgen_writer writer = {
+        .write = write_callback,
+        .ctx = NULL,
+    };
+
     if (rp.error != READARG_ESUCCESS)
     {
+        fprintf(stderr, "Error: %d\n", rp.error);
+        readarg_helpgen_put_usage(&rp, &writer, progname, "Usage");
         return 1;
+    }
+
+    if (rp.opts[OPT_HELP].arg.val.len >= 1)
+    {
+        readarg_helpgen_put_usage(&rp, &writer, progname, "Usage");
+        return 0;
+    }
+
+    if (rp.opts[OPT_VERSION].arg.val.len >= 1)
+    {
+        printf("0.0.0\n");
+        return 0;
     }
 
     printf("opt:\n");
@@ -175,4 +203,10 @@ int main(int argc, char **argv)
     }
 
     return 0;
+}
+
+static int write_callback(void *ctx, const char *buf, size_t len)
+{
+    (void)ctx;
+    return fwrite(buf, 1, len, stderr) == len;
 }
