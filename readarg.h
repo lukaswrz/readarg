@@ -630,24 +630,21 @@ int readarg_helpgen_put_usage(struct readarg_parser *rp, struct readarg_helpgen_
                         {
                             READARG_HELPGEN_TRY_LIT(writer, ", ");
                         }
-                        else
+                        else if (opts[i].req)
                         {
-                            if (opts[i].req)
+                            READARG_HELPGEN_TRY_LIT(writer, " ");
+                            if (opts[i].arg.name)
                             {
-                                READARG_HELPGEN_TRY_LIT(writer, " ");
-                                if (opts[i].arg.name)
-                                {
-                                    READARG_HELPGEN_TRY_STR(writer, opts[i].arg.name);
-                                }
-                                else
-                                {
-                                    READARG_HELPGEN_TRY_LIT(writer, "value");
-                                }
+                                READARG_HELPGEN_TRY_STR(writer, opts[i].arg.name);
+                            }
+                            else
+                            {
+                                READARG_HELPGEN_TRY_LIT(writer, "value");
+                            }
 
-                                if (inf)
-                                {
-                                    READARG_HELPGEN_TRY_LIT(writer, "...");
-                                }
+                            if (inf)
+                            {
+                                READARG_HELPGEN_TRY_LIT(writer, "...");
                             }
                         }
                     }
