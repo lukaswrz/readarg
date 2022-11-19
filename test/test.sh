@@ -26,10 +26,12 @@
 	--sort \
 	u \
 	v \
-	--help \
 	w \
-	--version \
 	-- \
 	x \
 	y \
 	z
+
+./test -e a b c --help
+
+./test -e a b c --version
