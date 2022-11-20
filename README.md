@@ -24,8 +24,7 @@ It is required that one file in your project defines the
 as with any other single-header library.
 
 An example for how to use readarg can be found in `test/test.c`. If you want to
-see how readarg represents options and operands, execute `test.sh` in the same
-directory.
+see how readarg represents options and operands, run `test.bash`.
 
 ## Terminology
 
