@@ -45,9 +45,6 @@ struct readarg_opt
 {
     /* Two null-terminated arrays of either long or short option names. */
     char **names[2];
-
-    int req;
-
     struct readarg_arg arg;
 };
 
@@ -249,7 +246,7 @@ static void readarg_parse_opt(struct readarg_parser *rp, enum readarg_form form,
         {
             const char *strpos = *pos;
 
-            if (!match->req && *strpos)
+            if (!match->arg.name && *strpos)
             {
                 rp->state.grppos = strpos;
                 readarg_update_opt(rp, NULL, match);
@@ -348,7 +345,7 @@ static struct readarg_opt *readarg_match_finish(struct readarg_parser *rp, const
 
 static void readarg_update_opt(struct readarg_parser *rp, const char *attach, struct readarg_opt *opt)
 {
-    if (opt->req)
+    if (opt->arg.name)
     {
         if (attach)
         {
@@ -630,17 +627,10 @@ int readarg_helpgen_put_usage(struct readarg_parser *rp, struct readarg_helpgen_
                         {
                             READARG_HELPGEN_TRY_LIT(writer, ", ");
                         }
-                        else if (opts[i].req)
+                        else if (opts[i].arg.name)
                         {
                             READARG_HELPGEN_TRY_LIT(writer, " ");
-                            if (opts[i].arg.name)
-                            {
-                                READARG_HELPGEN_TRY_STR(writer, opts[i].arg.name);
-                            }
-                            else
-                            {
-                                READARG_HELPGEN_TRY_LIT(writer, "value");
-                            }
+                            READARG_HELPGEN_TRY_STR(writer, opts[i].arg.name);
 
                             if (inf)
                             {

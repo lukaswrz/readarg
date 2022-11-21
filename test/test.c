@@ -38,40 +38,45 @@ int main(int argc, char **argv)
                 [READARG_FORM_SHORT] = READARG_STRINGS("e", "x"),
                 [READARG_FORM_LONG] = READARG_STRINGS("expr", "expression"),
             },
-            .req = 1,
-            .arg.bounds.val = {
-                1,
-                4,
-            },
+            .arg = {
+                .name = "expression",
+                .bounds.val = {
+                    1,
+                    4,
+                },
+            }
         },
         {
             .names = {
                 [READARG_FORM_SHORT] = READARG_STRINGS("c"),
                 [READARG_FORM_LONG] = READARG_STRINGS("config"),
             },
-            .req = 1,
             .arg = {
                 .name = "file",
                 .bounds.val = {
                     2,
                 },
-            },
+            }
         },
         {
             .names = {
                 [READARG_FORM_SHORT] = READARG_STRINGS("i"),
                 [READARG_FORM_LONG] = READARG_STRINGS("uri"),
             },
-            .req = 1,
-            .arg.bounds.inf = 1,
+            .arg = {
+                .name = "uri",
+                .bounds.inf = 1,
+            }
         },
         {
             .names = {
                 [READARG_FORM_SHORT] = READARG_STRINGS("b"),
                 [READARG_FORM_LONG] = READARG_STRINGS("backup", "backup-file"),
             },
-            .req = 1,
-            .arg.bounds.inf = 1,
+            .arg = {
+                .name = "file",
+                .bounds.inf = 1,
+            }
         },
         {
             .names = {
@@ -178,7 +183,7 @@ int main(int argc, char **argv)
                 }
             }
             printf("{ [%zu] ", curr[i].arg.val.len);
-            if (curr[i].req)
+            if (curr[i].arg.name)
             {
                 struct readarg_view_strings val = curr[i].arg.val;
                 for (size_t j = 0; j < val.len; j++)
