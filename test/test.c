@@ -95,9 +95,7 @@ int main(int argc, char **argv)
             .arg.bounds.inf = 1,
         },
         {
-            {
-                0,
-            },
+            0,
         },
     };
 

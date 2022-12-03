@@ -1,6 +1,6 @@
 cc      = cc
 macros  = -D NDEBUG
-cflags  = -std=c99 -Wall -Wextra -Wpedantic -g $macros -O2
+cflags  = -std=c99 -Wno-missing-braces -Wall -Wextra -Wpedantic -g $macros -O2
 ldflags =
 ldlibs  =
 
