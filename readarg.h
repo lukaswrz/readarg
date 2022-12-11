@@ -77,6 +77,10 @@ struct readarg_helpgen_writer {
 int readarg_parse(struct readarg_parser *rp);
 /* args should always exclude the first element. */
 void readarg_parser_init(struct readarg_parser *rp, struct readarg_opt *opts, struct readarg_arg *opers, struct readarg_view_strings args);
+/* Assign operands from the operand list to operands defined for the parser. */
+void readarg_assign_opers(struct readarg_parser *rp);
+/* Validate that all options meet their requirements. */
+struct readarg_opt *readarg_validate_opts(struct readarg_parser *rp);
 /* Check whether the argument is a valid option. */
 int readarg_validate_opt(struct readarg_opt *opt);
 /* Check whether the argument is a valid argument. */
@@ -109,8 +113,6 @@ static struct readarg_opt *readarg_match_finish(struct readarg_parser *rp, const
 static void readarg_update_opt(struct readarg_parser *rp, const char *attach, struct readarg_opt *opt);
 static void readarg_update_oper(struct readarg_parser *rp, struct readarg_view_strings val);
 
-static void readarg_assign_opers(struct readarg_parser *rp);
-
 static void readarg_add_val(struct readarg_parser *rp, struct readarg_arg *arg, const char *string, int end);
 
 static const char *readarg_skip_incl(const char *outer, const char *inner);
@@ -121,6 +123,65 @@ static void readarg_permute_val(struct readarg_parser *rp, struct readarg_view_s
 static void readarg_incr_between(const char **start, const char **stop, struct readarg_view_strings *curr, struct readarg_view_strings *exclude);
 static void readarg_permute_rest(const char **target, struct readarg_view_strings start);
 
+struct readarg_opt *readarg_validate_opts(struct readarg_parser *rp) {
+    for (size_t i = 0; readarg_validate_opt(rp->opts + i); i++) {
+        if (!readarg_validate_within(&rp->opts[i].arg)) {
+            rp->error = READARG_ERANGEOPT;
+            return &rp->opts[i];
+        }
+    }
+
+    return NULL;
+}
+
+void readarg_assign_opers(struct readarg_parser *rp) {
+    size_t count = rp->state.curr.ioper.len;
+
+    size_t nlower = 0;
+    size_t nupper = 0;
+    for (size_t i = 0; readarg_validate_arg(rp->opers + i); i++) {
+        nlower += readarg_select_lower(rp->opers[i].bounds);
+        nupper += readarg_select_upper(rp->opers[i].bounds);
+    }
+
+    if (count < nlower) {
+        rp->error = READARG_ERANGEOPER;
+        return;
+    }
+
+    struct {
+        size_t extra;
+        size_t req;
+    } rest = {
+        count - nlower,
+        nlower,
+    };
+
+    for (size_t i = 0; readarg_validate_arg(rp->opers + i); i++) {
+        if (count == 0 || !rp->opers[i].val.strings) {
+            size_t off = count - (rest.extra + rest.req);
+            rp->opers[i].val.strings = rp->state.curr.ioper.strings + off;
+        }
+
+        size_t lower = readarg_select_lower(rp->opers[i].bounds);
+        size_t upper = readarg_select_upper(rp->opers[i].bounds);
+        int inf = rp->opers[i].bounds.inf;
+
+        size_t add;
+
+        /* Add required elements. */
+        add = rest.req > lower ? lower : rest.req;
+        rp->opers[i].val.len += add, rest.req -= add;
+
+        /* Add optional elements. */
+        add = inf ? rest.extra : rest.extra > upper ? upper : rest.extra;
+        rp->opers[i].val.len += add, rest.extra -= add;
+    }
+
+    if (rest.extra || rest.req)
+        rp->error = READARG_ERANGEOPER;
+}
+
 int readarg_parse(struct readarg_parser *rp) {
     /* Check whether the current offset is at the end of argv. */
     size_t off = rp->state.curr.arg - rp->args.strings;
@@ -128,17 +189,8 @@ int readarg_parse(struct readarg_parser *rp) {
         if (rp->state.pending) {
             /* The last specified option required an argument, but no argument has been provided. */
             rp->error = READARG_ENOVAL;
-            return 0;
         }
 
-        for (size_t i = 0; readarg_validate_opt(rp->opts + i); i++) {
-            if (!readarg_validate_within(&rp->opts[i].arg)) {
-                rp->error = READARG_ERANGEOPT;
-                return 0;
-            }
-        }
-
-        readarg_assign_opers(rp);
         return 0;
     }
 
@@ -329,54 +381,6 @@ static void readarg_update_oper(struct readarg_parser *rp, struct readarg_view_s
         readarg_permute_rest(rp->state.curr.eoval, val);
         rp->state.curr.ioper.len += val.len;
     }
-}
-
-static void readarg_assign_opers(struct readarg_parser *rp) {
-    size_t count = rp->state.curr.ioper.len;
-
-    size_t nlower = 0;
-    size_t nupper = 0;
-    for (size_t i = 0; readarg_validate_arg(rp->opers + i); i++) {
-        nlower += readarg_select_lower(rp->opers[i].bounds);
-        nupper += readarg_select_upper(rp->opers[i].bounds);
-    }
-
-    if (count < nlower) {
-        rp->error = READARG_ERANGEOPER;
-        return;
-    }
-
-    struct {
-        size_t extra;
-        size_t req;
-    } rest = {
-        count - nlower,
-        nlower,
-    };
-
-    for (size_t i = 0; readarg_validate_arg(rp->opers + i); i++) {
-        if (count == 0 || !rp->opers[i].val.strings) {
-            size_t off = count - (rest.extra + rest.req);
-            rp->opers[i].val.strings = rp->state.curr.ioper.strings + off;
-        }
-
-        size_t lower = readarg_select_lower(rp->opers[i].bounds);
-        size_t upper = readarg_select_upper(rp->opers[i].bounds);
-        int inf = rp->opers[i].bounds.inf;
-
-        size_t add;
-
-        /* Add required elements. */
-        add = rest.req > lower ? lower : rest.req;
-        rp->opers[i].val.len += add, rest.req -= add;
-
-        /* Add optional elements. */
-        add = inf ? rest.extra : rest.extra > upper ? upper : rest.extra;
-        rp->opers[i].val.len += add, rest.extra -= add;
-    }
-
-    if (rest.extra || rest.req)
-        rp->error = READARG_ERANGEOPER;
 }
 
 static void readarg_add_val(struct readarg_parser *rp, struct readarg_arg *arg, const char *string, int end) {

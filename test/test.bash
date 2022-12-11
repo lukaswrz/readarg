@@ -34,7 +34,3 @@ cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null
 	x \
 	y \
 	z
-
-./test -e a b c --help
-
-./test -e a b c --version

@@ -147,6 +147,13 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    struct readarg_opt *erropt = readarg_validate_opts(&rp);
+    if (erropt != NULL) {
+        fprintf(stderr, "Error: %d\n", rp.error);
+        readarg_helpgen_put_usage(&rp, &writer, progname, "Usage");
+        return 1;
+    }
+
     if (rp.opts[OPT_HELP].arg.val.len >= 1) {
         readarg_helpgen_put_usage(&rp, &writer, progname, "Usage");
         return 0;
