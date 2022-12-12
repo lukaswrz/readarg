@@ -40,5 +40,3 @@ values to operands. The advantage of this approach is as follows:
 * Allocations are not needed because the memory provided by `argv` is reused
 * It's fairly simple to represent all of this data in an intuitive data
   structure (in my opinion anyway)
-  * For example, looping through operands is as simple as incrementing
-    `parser.oper` until `readarg_validate_arg` returns `0`.

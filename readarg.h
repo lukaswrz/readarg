@@ -43,7 +43,9 @@ struct readarg_opt {
 };
 
 struct readarg_parser {
+    size_t nopts;
     struct readarg_opt *opts;
+    size_t nopers;
     struct readarg_arg *opers;
     struct readarg_view_strings args;
     struct {
@@ -76,22 +78,19 @@ struct readarg_helpgen_writer {
 /* Iteratively parse the arguments. */
 int readarg_parse(struct readarg_parser *rp);
 /* args should always exclude the first element. */
-void readarg_parser_init(struct readarg_parser *rp, struct readarg_opt *opts, struct readarg_arg *opers, struct readarg_view_strings args);
+void readarg_parser_init(struct readarg_parser *rp, struct readarg_opt *opts, size_t nopts, struct readarg_arg *opers, size_t nopers, struct readarg_view_strings args);
+/* Output usage information. */
+int readarg_helpgen_put_usage(struct readarg_parser *rp, struct readarg_helpgen_writer *writer, const char *progname, const char *usage);
 /* Assign operands from the operand list to operands defined for the parser. */
 void readarg_assign_opers(struct readarg_parser *rp);
 /* Validate that all options meet their requirements. */
 struct readarg_opt *readarg_validate_opts(struct readarg_parser *rp);
-/* Check whether the argument is a valid option. */
-int readarg_validate_opt(struct readarg_opt *opt);
-/* Check whether the argument is a valid argument. */
-int readarg_validate_arg(struct readarg_arg *arg);
 /* Check whether the argument's values are within the defined limits. */
-int readarg_validate_within(struct readarg_arg *arg);
+int readarg_validate_arg(struct readarg_arg *arg);
 /* Get the upper limit. */
 size_t readarg_select_upper(struct readarg_bounds bounds);
 /* Get the lower limit. This does not always return the minimum. */
 size_t readarg_select_lower(struct readarg_bounds bounds);
-int readarg_helpgen_put_usage(struct readarg_parser *rp, struct readarg_helpgen_writer *writer, const char *progname, const char *usage);
 
 #ifdef READARG_IMPLEMENTATION
 
@@ -99,6 +98,15 @@ int readarg_helpgen_put_usage(struct readarg_parser *rp, struct readarg_helpgen_
 #pragma push_macro("NDEBUG")
 #undef NDEBUG
 #endif
+
+#define READARG_HELPGEN_TRY(writer, buf, len)                                  \
+    do {                                                                       \
+        int readarg_helpgen_rv = (writer)->write((writer)->ctx, (buf), (len)); \
+        if (!readarg_helpgen_rv)                                               \
+            return readarg_helpgen_rv;                                         \
+    } while (0)
+#define READARG_HELPGEN_TRY_LIT(writer, s) READARG_HELPGEN_TRY((writer), (s), (sizeof(s) - 1))
+#define READARG_HELPGEN_TRY_STR(writer, s) READARG_HELPGEN_TRY((writer), (s), (strlen((s))))
 
 #include <assert.h>
 #include <string.h>
@@ -122,65 +130,6 @@ static void readarg_occ_opt(struct readarg_parser *rp, struct readarg_opt *opt);
 static void readarg_permute_val(struct readarg_parser *rp, struct readarg_view_strings *target, const char *val, int end);
 static void readarg_incr_between(const char **start, const char **stop, struct readarg_view_strings *curr, struct readarg_view_strings *exclude);
 static void readarg_permute_rest(const char **target, struct readarg_view_strings start);
-
-struct readarg_opt *readarg_validate_opts(struct readarg_parser *rp) {
-    for (size_t i = 0; readarg_validate_opt(rp->opts + i); i++) {
-        if (!readarg_validate_within(&rp->opts[i].arg)) {
-            rp->error = READARG_ERANGEOPT;
-            return &rp->opts[i];
-        }
-    }
-
-    return NULL;
-}
-
-void readarg_assign_opers(struct readarg_parser *rp) {
-    size_t count = rp->state.curr.ioper.len;
-
-    size_t nlower = 0;
-    size_t nupper = 0;
-    for (size_t i = 0; readarg_validate_arg(rp->opers + i); i++) {
-        nlower += readarg_select_lower(rp->opers[i].bounds);
-        nupper += readarg_select_upper(rp->opers[i].bounds);
-    }
-
-    if (count < nlower) {
-        rp->error = READARG_ERANGEOPER;
-        return;
-    }
-
-    struct {
-        size_t extra;
-        size_t req;
-    } rest = {
-        count - nlower,
-        nlower,
-    };
-
-    for (size_t i = 0; readarg_validate_arg(rp->opers + i); i++) {
-        if (count == 0 || !rp->opers[i].val.strings) {
-            size_t off = count - (rest.extra + rest.req);
-            rp->opers[i].val.strings = rp->state.curr.ioper.strings + off;
-        }
-
-        size_t lower = readarg_select_lower(rp->opers[i].bounds);
-        size_t upper = readarg_select_upper(rp->opers[i].bounds);
-        int inf = rp->opers[i].bounds.inf;
-
-        size_t add;
-
-        /* Add required elements. */
-        add = rest.req > lower ? lower : rest.req;
-        rp->opers[i].val.len += add, rest.req -= add;
-
-        /* Add optional elements. */
-        add = inf ? rest.extra : rest.extra > upper ? upper : rest.extra;
-        rp->opers[i].val.len += add, rest.extra -= add;
-    }
-
-    if (rest.extra || rest.req)
-        rp->error = READARG_ERANGEOPER;
-}
 
 int readarg_parse(struct readarg_parser *rp) {
     /* Check whether the current offset is at the end of argv. */
@@ -207,6 +156,226 @@ int readarg_parse(struct readarg_parser *rp) {
         ++rp->state.curr.arg;
 
     return !rp->error;
+}
+
+void readarg_parser_init(struct readarg_parser *rp, struct readarg_opt *opts, size_t nopts, struct readarg_arg *opers, size_t nopers, struct readarg_view_strings args) {
+    *rp = (struct readarg_parser){
+        .args = args,
+        .opts = opts,
+        .nopts = nopts,
+        .opers = opers,
+        .nopers = nopers,
+        .state.curr = {
+            .arg = args.strings,
+            .eoval = args.strings,
+        },
+    };
+}
+
+int readarg_helpgen_put_usage(struct readarg_parser *rp, struct readarg_helpgen_writer *writer, const char *progname, const char *usage) {
+    READARG_HELPGEN_TRY_STR(writer, usage);
+    READARG_HELPGEN_TRY_LIT(writer, ":\n");
+
+    READARG_HELPGEN_TRY_STR(writer, progname);
+    READARG_HELPGEN_TRY_LIT(writer, "\n");
+
+    int optwritten = 0, operwritten = 0;
+    int next;
+
+    struct readarg_opt *opts = rp->opts;
+    next = !!rp->nopts;
+    for (size_t i = 0; next; i++) {
+        optwritten = 1;
+
+        if (i == 0) {
+            READARG_HELPGEN_TRY_LIT(writer, "  ");
+        }
+
+        next = i + 1 < rp->nopts;
+        size_t lower = readarg_select_lower(opts[i].arg.bounds);
+        size_t upper = readarg_select_upper(opts[i].arg.bounds);
+        int inf = opts[i].arg.bounds.inf;
+        size_t nforms = sizeof opts[i].names / sizeof *opts[i].names;
+
+        for (size_t j = 0; j < (upper ? upper : !!inf); j++) {
+            if (j >= lower) {
+                READARG_HELPGEN_TRY_LIT(writer, "[");
+            }
+
+            for (size_t k = 0; k < nforms; k++) {
+                int grp = 0;
+                if (opts[i].names[k]) {
+                    for (size_t l = 0; opts[i].names[k][l]; l++) {
+                        if (!grp) {
+                            if (k == READARG_FORM_SHORT) {
+                                READARG_HELPGEN_TRY_LIT(writer, "-");
+                            }
+
+                            if (k == READARG_FORM_LONG) {
+                                READARG_HELPGEN_TRY_LIT(writer, "--");
+                            }
+                        }
+
+                        READARG_HELPGEN_TRY_STR(writer, opts[i].names[k][l]);
+
+                        if (k == READARG_FORM_SHORT) {
+                            grp = 1;
+                            if (!opts[i].names[k][l + 1]) {
+                                READARG_HELPGEN_TRY_LIT(writer, ", ");
+                            }
+                            continue;
+                        } else if (k + 1 < nforms || opts[i].names[k][l + 1]) {
+                            READARG_HELPGEN_TRY_LIT(writer, ", ");
+                        } else if (opts[i].arg.name) {
+                            READARG_HELPGEN_TRY_LIT(writer, " ");
+                            READARG_HELPGEN_TRY_STR(writer, opts[i].arg.name);
+
+                            if (inf) {
+                                READARG_HELPGEN_TRY_LIT(writer, "...");
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (j >= lower) {
+                READARG_HELPGEN_TRY_LIT(writer, "]");
+            }
+
+            if (next) {
+                READARG_HELPGEN_TRY_LIT(writer, "\n  ");
+            }
+        }
+    }
+
+    if (optwritten) {
+        READARG_HELPGEN_TRY_LIT(writer, "\n");
+    }
+
+    struct readarg_arg *opers = rp->opers;
+    next = !!rp->nopers;
+    for (size_t i = 0; next; i++) {
+        operwritten = 1;
+
+        if (i == 0) {
+            READARG_HELPGEN_TRY_LIT(writer, "  ");
+        }
+
+        next = i + 1 < rp->nopers;
+        size_t lower = readarg_select_lower(opers[i].bounds);
+        size_t upper = readarg_select_upper(opers[i].bounds);
+        int inf = opers[i].bounds.inf;
+
+        for (size_t j = 0; j < lower; j++) {
+            READARG_HELPGEN_TRY_STR(writer, opers[i].name);
+
+            if (inf && j + 1 == lower) {
+                READARG_HELPGEN_TRY_LIT(writer, "...");
+            }
+
+            if (next) {
+                READARG_HELPGEN_TRY_LIT(writer, "\n  ");
+            }
+        }
+
+        size_t amt = upper ? upper : inf ? lower + 1 : 0;
+        for (size_t j = lower; j < amt; j++) {
+            READARG_HELPGEN_TRY_LIT(writer, "[");
+
+            READARG_HELPGEN_TRY_STR(writer, opers[i].name);
+
+            if (inf && j + 1 == amt) {
+                READARG_HELPGEN_TRY_LIT(writer, "...");
+            }
+
+            READARG_HELPGEN_TRY_LIT(writer, "]");
+
+            if (next) {
+                READARG_HELPGEN_TRY_LIT(writer, "\n  ");
+            }
+        }
+    }
+
+    if (operwritten) {
+        READARG_HELPGEN_TRY_LIT(writer, "\n");
+    }
+
+    return 1;
+}
+
+
+void readarg_assign_opers(struct readarg_parser *rp) {
+    size_t count = rp->state.curr.ioper.len;
+
+    size_t nlower = 0;
+    size_t nupper = 0;
+    for (size_t i = 0; i < rp->nopers; i++) {
+        nlower += readarg_select_lower(rp->opers[i].bounds);
+        nupper += readarg_select_upper(rp->opers[i].bounds);
+    }
+
+    if (count < nlower) {
+        rp->error = READARG_ERANGEOPER;
+        return;
+    }
+
+    struct {
+        size_t extra;
+        size_t req;
+    } rest = {
+        count - nlower,
+        nlower,
+    };
+
+    for (size_t i = 0; i < rp->nopers; i++) {
+        if (count == 0 || !rp->opers[i].val.strings) {
+            size_t off = count - (rest.extra + rest.req);
+            rp->opers[i].val.strings = rp->state.curr.ioper.strings + off;
+        }
+
+        size_t lower = readarg_select_lower(rp->opers[i].bounds);
+        size_t upper = readarg_select_upper(rp->opers[i].bounds);
+        int inf = rp->opers[i].bounds.inf;
+
+        size_t add;
+
+        /* Add required elements. */
+        add = rest.req > lower ? lower : rest.req;
+        rp->opers[i].val.len += add, rest.req -= add;
+
+        /* Add optional elements. */
+        add = inf ? rest.extra : rest.extra > upper ? upper : rest.extra;
+        rp->opers[i].val.len += add, rest.extra -= add;
+    }
+
+    if (rest.extra || rest.req)
+        rp->error = READARG_ERANGEOPER;
+}
+
+struct readarg_opt *readarg_validate_opts(struct readarg_parser *rp) {
+    for (size_t i = 0; i < rp->nopts; i++) {
+        if (!readarg_validate_arg(&rp->opts[i].arg)) {
+            rp->error = READARG_ERANGEOPT;
+            return &rp->opts[i];
+        }
+    }
+
+    return NULL;
+}
+
+int readarg_validate_arg(struct readarg_arg *arg) {
+    size_t occ = arg->val.len;
+    size_t upper = readarg_select_upper(arg->bounds);
+    size_t lower = readarg_select_lower(arg->bounds);
+    return occ >= lower && (occ <= upper || arg->bounds.inf);
+}
+
+size_t readarg_select_upper(struct readarg_bounds bounds) {
+    return bounds.val[0] > bounds.val[1] ? bounds.val[0] : bounds.val[1];
+}
+
+size_t readarg_select_lower(struct readarg_bounds bounds) {
+    return bounds.inf ? readarg_select_upper(bounds) : bounds.val[0] < bounds.val[1] ? bounds.val[0] : bounds.val[1];
 }
 
 static void readarg_parse_arg(struct readarg_parser *rp, const char *arg) {
@@ -312,10 +481,9 @@ static struct readarg_opt *readarg_match_opt(struct readarg_parser *rp, enum rea
         struct readarg_opt *opt;
     } loose = {0};
 
-    struct readarg_opt *haystack = rp->opts;
-    for (size_t i = 0; readarg_validate_opt(haystack + i); i++) {
+    for (size_t i = 0; i < rp->nopts; i++) {
         /* Iterate through all short or long names of the current option. */
-        char **names = haystack[i].names[form];
+        char **names = rp->opts[i].names[form];
 
         if (!names)
             /* Ignore the option as it does not have names in the required form. */
@@ -332,10 +500,10 @@ static struct readarg_opt *readarg_match_opt(struct readarg_parser *rp, enum rea
 
             if (!*cmp)
                 /* A guaranteed match. */
-                return readarg_match_finish(rp, needle, cmp, haystack + i);
+                return readarg_match_finish(rp, needle, cmp, rp->opts + i);
             else if ((cmp - *needle) > (loose.adv - *needle))
                 /* Maybe a match, maybe not. */
-                loose.adv = cmp, loose.opt = haystack + i;
+                loose.adv = cmp, loose.opt = rp->opts + i;
         }
     }
 
@@ -386,7 +554,7 @@ static void readarg_update_oper(struct readarg_parser *rp, struct readarg_view_s
 static void readarg_add_val(struct readarg_parser *rp, struct readarg_arg *arg, const char *string, int end) {
     rp->state.pending = 0;
 
-    if (!readarg_validate_within(arg))
+    if (!readarg_validate_arg(arg))
         rp->error = READARG_ERANGEOPT;
     else
         readarg_permute_val(rp, &arg->val, string, end);
@@ -412,7 +580,7 @@ static void readarg_permute_val(struct readarg_parser *rp, struct readarg_view_s
         /* Fallback position when no value has yet been set. */
         target->strings = rp->state.curr.eoval - (end ? 0 : rp->state.curr.ioper.len);
 
-    const char **pos = target->strings + (target->len - 1);
+    const char **pos = target->strings + target->len - 1;
 
     assert(rp->state.curr.arg >= rp->state.curr.eoval);
 
@@ -424,7 +592,7 @@ static void readarg_permute_val(struct readarg_parser *rp, struct readarg_view_s
     const char **start = pos, **stop = rp->state.curr.eoval;
 
     /* Increment all value pointers in the options which are between start and stop (inclusive). */
-    for (size_t i = 0; readarg_validate_opt(rp->opts + i); i++)
+    for (size_t i = 0; i < rp->nopts; i++)
         readarg_incr_between(start, stop, &rp->opts[i].arg.val, target);
 
     readarg_incr_between(start, stop, &rp->state.curr.ioper, target);
@@ -437,183 +605,6 @@ static void readarg_incr_between(const char **start, const char **stop, struct r
 
 static void readarg_permute_rest(const char **target, struct readarg_view_strings start) {
     memmove(target, start.strings, start.len * sizeof *start.strings);
-}
-
-void readarg_parser_init(struct readarg_parser *rp, struct readarg_opt *opts, struct readarg_arg *opers, struct readarg_view_strings args) {
-    *rp = (struct readarg_parser){
-        .args = args,
-        .opts = opts,
-        .opers = opers,
-        .state.curr = {
-            .arg = args.strings,
-            .eoval = args.strings,
-        },
-    };
-}
-
-int readarg_validate_opt(struct readarg_opt *opt) {
-    assert(opt);
-    return opt->names[0] || opt->names[1];
-}
-
-int readarg_validate_arg(struct readarg_arg *arg) {
-    assert(arg);
-    return !!arg->name;
-}
-
-int readarg_validate_within(struct readarg_arg *arg) {
-    size_t occ = arg->val.len;
-    size_t upper = readarg_select_upper(arg->bounds);
-    size_t lower = readarg_select_lower(arg->bounds);
-    return occ >= lower && (occ <= upper || arg->bounds.inf);
-}
-
-size_t readarg_select_upper(struct readarg_bounds bounds) {
-    return bounds.val[0] > bounds.val[1] ? bounds.val[0] : bounds.val[1];
-}
-
-size_t readarg_select_lower(struct readarg_bounds bounds) {
-    return bounds.inf ? readarg_select_upper(bounds) : bounds.val[0] < bounds.val[1] ? bounds.val[0] : bounds.val[1];
-}
-
-#define READARG_HELPGEN_TRY(writer, buf, len)                                  \
-    do {                                                                       \
-        int readarg_helpgen_rv = (writer)->write((writer)->ctx, (buf), (len)); \
-        if (!readarg_helpgen_rv)                                               \
-            return readarg_helpgen_rv;                                         \
-    } while (0)
-#define READARG_HELPGEN_TRY_LIT(writer, s) READARG_HELPGEN_TRY((writer), (s), (sizeof(s) - 1))
-#define READARG_HELPGEN_TRY_STR(writer, s) READARG_HELPGEN_TRY((writer), (s), (strlen((s))))
-
-int readarg_helpgen_put_usage(struct readarg_parser *rp, struct readarg_helpgen_writer *writer, const char *progname, const char *usage) {
-    READARG_HELPGEN_TRY_STR(writer, usage);
-    READARG_HELPGEN_TRY_LIT(writer, ":\n");
-
-    READARG_HELPGEN_TRY_STR(writer, progname);
-    READARG_HELPGEN_TRY_LIT(writer, "\n");
-
-    int optwritten = 0, operwritten = 0;
-    int nxvalid;
-
-    struct readarg_opt *opts = rp->opts;
-    nxvalid = readarg_validate_opt(opts);
-    for (size_t i = 0; nxvalid; i++) {
-        optwritten = 1;
-
-        if (i == 0) {
-            READARG_HELPGEN_TRY_LIT(writer, "  ");
-        }
-
-        nxvalid = readarg_validate_opt(opts + i + 1);
-        size_t lower = readarg_select_lower(opts[i].arg.bounds);
-        size_t upper = readarg_select_upper(opts[i].arg.bounds);
-        int inf = opts[i].arg.bounds.inf;
-        size_t nforms = sizeof opts[i].names / sizeof *opts[i].names;
-
-        for (size_t j = 0; j < (upper ? upper : !!inf); j++) {
-            if (j >= lower) {
-                READARG_HELPGEN_TRY_LIT(writer, "[");
-            }
-
-            for (size_t k = 0; k < nforms; k++) {
-                int grp = 0;
-                if (opts[i].names[k]) {
-                    for (size_t l = 0; opts[i].names[k][l]; l++) {
-                        if (!grp) {
-                            if (k == READARG_FORM_SHORT) {
-                                READARG_HELPGEN_TRY_LIT(writer, "-");
-                            }
-
-                            if (k == READARG_FORM_LONG) {
-                                READARG_HELPGEN_TRY_LIT(writer, "--");
-                            }
-                        }
-
-                        READARG_HELPGEN_TRY_STR(writer, opts[i].names[k][l]);
-
-                        if (k == READARG_FORM_SHORT) {
-                            grp = 1;
-                            if (!opts[i].names[k][l + 1]) {
-                                READARG_HELPGEN_TRY_LIT(writer, ", ");
-                            }
-                            continue;
-                        } else if (k + 1 < nforms || opts[i].names[k][l + 1]) {
-                            READARG_HELPGEN_TRY_LIT(writer, ", ");
-                        } else if (opts[i].arg.name) {
-                            READARG_HELPGEN_TRY_LIT(writer, " ");
-                            READARG_HELPGEN_TRY_STR(writer, opts[i].arg.name);
-
-                            if (inf) {
-                                READARG_HELPGEN_TRY_LIT(writer, "...");
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (j >= lower) {
-                READARG_HELPGEN_TRY_LIT(writer, "]");
-            }
-
-            if (nxvalid) {
-                READARG_HELPGEN_TRY_LIT(writer, "\n  ");
-            }
-        }
-    }
-
-    if (optwritten) {
-        READARG_HELPGEN_TRY_LIT(writer, "\n");
-    }
-
-    struct readarg_arg *opers = rp->opers;
-    nxvalid = readarg_validate_arg(opers);
-    for (size_t i = 0; nxvalid; i++) {
-        operwritten = 1;
-
-        if (i == 0) {
-            READARG_HELPGEN_TRY_LIT(writer, "  ");
-        }
-
-        nxvalid = readarg_validate_arg(opers + i + 1);
-        size_t lower = readarg_select_lower(opers[i].bounds);
-        size_t upper = readarg_select_upper(opers[i].bounds);
-        int inf = opers[i].bounds.inf;
-
-        for (size_t j = 0; j < lower; j++) {
-            READARG_HELPGEN_TRY_STR(writer, opers[i].name);
-
-            if (inf && j + 1 == lower) {
-                READARG_HELPGEN_TRY_LIT(writer, "...");
-            }
-
-            if (nxvalid) {
-                READARG_HELPGEN_TRY_LIT(writer, "\n  ");
-            }
-        }
-
-        size_t amt = upper ? upper : inf ? lower + 1 : 0;
-        for (size_t j = lower; j < amt; j++) {
-            READARG_HELPGEN_TRY_LIT(writer, "[");
-
-            READARG_HELPGEN_TRY_STR(writer, opers[i].name);
-
-            if (inf && j + 1 == amt) {
-                READARG_HELPGEN_TRY_LIT(writer, "...");
-            }
-
-            READARG_HELPGEN_TRY_LIT(writer, "]");
-
-            if (nxvalid) {
-                READARG_HELPGEN_TRY_LIT(writer, "\n  ");
-            }
-        }
-    }
-
-    if (operwritten) {
-        READARG_HELPGEN_TRY_LIT(writer, "\n");
-    }
-
-    return 1;
 }
 
 #ifdef READARG_DEBUG

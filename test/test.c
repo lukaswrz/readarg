@@ -92,9 +92,6 @@ int main(int argc, char **argv) {
             },
             .arg.bounds.inf = 1,
         },
-        {
-            0,
-        },
     };
 
     struct readarg_arg opers[] = {
@@ -120,13 +117,10 @@ int main(int argc, char **argv) {
                 .inf = 1,
             },
         },
-        {
-            0,
-        },
     };
 
     struct readarg_parser rp;
-    readarg_parser_init(&rp, opts, opers,
+    readarg_parser_init(&rp, opts, sizeof opts / sizeof *opts, opers, sizeof opers / sizeof *opers,
                         (struct readarg_view_strings){
                             .strings = (const char **)argv + 1,
                             .len = argc - 1,
@@ -147,13 +141,6 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    struct readarg_opt *erropt = readarg_validate_opts(&rp);
-    if (erropt != NULL) {
-        fprintf(stderr, "Error: %d\n", rp.error);
-        readarg_helpgen_put_usage(&rp, &writer, progname, "Usage");
-        return 1;
-    }
-
     if (rp.opts[OPT_HELP].arg.val.len >= 1) {
         readarg_helpgen_put_usage(&rp, &writer, progname, "Usage");
         return 0;
@@ -164,10 +151,17 @@ int main(int argc, char **argv) {
         return 0;
     }
 
+    struct readarg_opt *erropt = readarg_validate_opts(&rp);
+    if (erropt != NULL) {
+        fprintf(stderr, "Error: %d\n", rp.error);
+        readarg_helpgen_put_usage(&rp, &writer, progname, "Usage");
+        return 1;
+    }
+
     printf("opt:\n");
     {
         struct readarg_opt *curr = rp.opts;
-        for (size_t i = 0; readarg_validate_opt(curr + i); i++) {
+        for (size_t i = 0; i < rp.nopts; i++) {
             for (size_t j = 0; j < sizeof curr[i].names / sizeof *curr[i].names; j++) {
                 if (curr[i].names[j]) {
                     for (size_t k = 0; curr[i].names[j][k]; k++) {
@@ -189,7 +183,7 @@ int main(int argc, char **argv) {
     printf("oper:\n");
     {
         struct readarg_arg *curr = rp.opers;
-        for (size_t i = 0; readarg_validate_arg(curr + i); i++) {
+        for (size_t i = 0; i < rp.nopers; i++) {
             printf("%s { [%zu] ", curr[i].name, curr[i].val.len);
             for (size_t j = 0; j < curr[i].val.len; j++) {
                 printf("%s ", curr[i].val.strings[j]);
