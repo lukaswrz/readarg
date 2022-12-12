@@ -308,11 +308,8 @@ void readarg_assign_opers(struct readarg_parser *rp) {
     size_t count = rp->state.curr.ioper.len;
 
     size_t nlower = 0;
-    size_t nupper = 0;
-    for (size_t i = 0; i < rp->nopers; i++) {
+    for (size_t i = 0; i < rp->nopers; i++)
         nlower += readarg_select_lower(rp->opers[i].bounds);
-        nupper += readarg_select_upper(rp->opers[i].bounds);
-    }
 
     if (count < nlower) {
         rp->error = READARG_ERANGEOPER;
