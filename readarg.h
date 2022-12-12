@@ -116,7 +116,6 @@ static void readarg_parse_arg(struct readarg_parser *rp, const char *arg);
 static void readarg_parse_opt(struct readarg_parser *rp, enum readarg_form form, const char **pos);
 
 static struct readarg_opt *readarg_match_opt(struct readarg_parser *rp, enum readarg_form form, const char **needle);
-static struct readarg_opt *readarg_match_finish(struct readarg_parser *rp, const char **needle, const char *adv, struct readarg_opt *opt);
 
 static void readarg_update_opt(struct readarg_parser *rp, const char *attach, struct readarg_opt *opt);
 static void readarg_update_oper(struct readarg_parser *rp, struct readarg_view_strings val);
@@ -135,10 +134,9 @@ int readarg_parse(struct readarg_parser *rp) {
     /* Check whether the current offset is at the end of argv. */
     size_t off = rp->state.curr.arg - rp->args.strings;
     if (off >= rp->args.len) {
-        if (rp->state.pending) {
+        if (rp->state.pending)
             /* The last specified option required an argument, but no argument has been provided. */
             rp->error = READARG_ENOVAL;
-        }
 
         return 0;
     }
@@ -187,9 +185,8 @@ int readarg_helpgen_put_usage(struct readarg_parser *rp, struct readarg_helpgen_
     for (size_t i = 0; next; i++) {
         optwritten = 1;
 
-        if (i == 0) {
+        if (i == 0)
             READARG_HELPGEN_TRY_LIT(writer, "  ");
-        }
 
         next = i + 1 < rp->nopts;
         size_t lower = readarg_select_lower(opts[i].arg.bounds);
@@ -198,9 +195,8 @@ int readarg_helpgen_put_usage(struct readarg_parser *rp, struct readarg_helpgen_
         size_t nforms = sizeof opts[i].names / sizeof *opts[i].names;
 
         for (size_t j = 0; j < (upper ? upper : !!inf); j++) {
-            if (j >= lower) {
+            if (j >= lower)
                 READARG_HELPGEN_TRY_LIT(writer, "[");
-            }
 
             for (size_t k = 0; k < nforms; k++) {
                 int grp = 0;
@@ -220,9 +216,8 @@ int readarg_helpgen_put_usage(struct readarg_parser *rp, struct readarg_helpgen_
 
                         if (k == READARG_FORM_SHORT) {
                             grp = 1;
-                            if (!opts[i].names[k][l + 1]) {
+                            if (!opts[i].names[k][l + 1])
                                 READARG_HELPGEN_TRY_LIT(writer, ", ");
-                            }
                             continue;
                         } else if (k + 1 < nforms || opts[i].names[k][l + 1]) {
                             READARG_HELPGEN_TRY_LIT(writer, ", ");
@@ -230,36 +225,31 @@ int readarg_helpgen_put_usage(struct readarg_parser *rp, struct readarg_helpgen_
                             READARG_HELPGEN_TRY_LIT(writer, " ");
                             READARG_HELPGEN_TRY_STR(writer, opts[i].arg.name);
 
-                            if (inf) {
+                            if (inf)
                                 READARG_HELPGEN_TRY_LIT(writer, "...");
-                            }
                         }
                     }
                 }
             }
 
-            if (j >= lower) {
+            if (j >= lower)
                 READARG_HELPGEN_TRY_LIT(writer, "]");
-            }
 
-            if (next) {
+            if (next)
                 READARG_HELPGEN_TRY_LIT(writer, "\n  ");
-            }
         }
     }
 
-    if (optwritten) {
+    if (optwritten)
         READARG_HELPGEN_TRY_LIT(writer, "\n");
-    }
 
     struct readarg_arg *opers = rp->opers;
     next = !!rp->nopers;
     for (size_t i = 0; next; i++) {
         operwritten = 1;
 
-        if (i == 0) {
+        if (i == 0)
             READARG_HELPGEN_TRY_LIT(writer, "  ");
-        }
 
         next = i + 1 < rp->nopers;
         size_t lower = readarg_select_lower(opers[i].bounds);
@@ -269,13 +259,11 @@ int readarg_helpgen_put_usage(struct readarg_parser *rp, struct readarg_helpgen_
         for (size_t j = 0; j < lower; j++) {
             READARG_HELPGEN_TRY_STR(writer, opers[i].name);
 
-            if (inf && j + 1 == lower) {
+            if (inf && j + 1 == lower)
                 READARG_HELPGEN_TRY_LIT(writer, "...");
-            }
 
-            if (next) {
+            if (next)
                 READARG_HELPGEN_TRY_LIT(writer, "\n  ");
-            }
         }
 
         size_t amt = upper ? upper : inf ? lower + 1 : 0;
@@ -284,21 +272,18 @@ int readarg_helpgen_put_usage(struct readarg_parser *rp, struct readarg_helpgen_
 
             READARG_HELPGEN_TRY_STR(writer, opers[i].name);
 
-            if (inf && j + 1 == amt) {
+            if (inf && j + 1 == amt)
                 READARG_HELPGEN_TRY_LIT(writer, "...");
-            }
 
             READARG_HELPGEN_TRY_LIT(writer, "]");
 
-            if (next) {
+            if (next)
                 READARG_HELPGEN_TRY_LIT(writer, "\n  ");
-            }
         }
     }
 
-    if (operwritten) {
+    if (operwritten)
         READARG_HELPGEN_TRY_LIT(writer, "\n");
-    }
 
     return 1;
 }
@@ -379,9 +364,8 @@ static void readarg_parse_arg(struct readarg_parser *rp, const char *arg) {
     /* Parse the next option in the grouped option string, which automatically advances it. */
     if (rp->state.grppos) {
         readarg_parse_opt(rp, READARG_FORM_SHORT, &rp->state.grppos);
-        if (!*rp->state.grppos) {
+        if (!*rp->state.grppos)
             rp->state.grppos = NULL;
-        }
         return;
     }
 
@@ -399,10 +383,9 @@ static void readarg_parse_arg(struct readarg_parser *rp, const char *arg) {
                 /* "--" denotes the end of options. */
                 off = rp->args.len - (rp->state.curr.arg - rp->args.strings);
                 assert(off);
-                if (off == 1) {
+                if (off == 1)
                     /* No operands after the "--". */
                     return;
-                }
 
                 readarg_update_oper(rp, (struct readarg_view_strings){
                                             .len = off - 1,
@@ -495,26 +478,23 @@ static struct readarg_opt *readarg_match_opt(struct readarg_parser *rp, enum rea
             if (!cmp)
                 continue;
 
-            if (!*cmp)
+            if (!*cmp) {
                 /* A guaranteed match. */
-                return readarg_match_finish(rp, needle, cmp, rp->opts + i);
-            else if ((cmp - *needle) > (loose.adv - *needle))
+                *needle = cmp;
+                return rp->state.curr.opt = rp->opts + i;
+            } else if ((cmp - *needle) > (loose.adv - *needle))
                 /* Maybe a match, maybe not. */
                 loose.adv = cmp, loose.opt = rp->opts + i;
         }
     }
 
-    return readarg_match_finish(rp, needle, loose.adv, loose.opt);
-}
+    if (loose.adv)
+        *needle = loose.adv;
 
-static struct readarg_opt *readarg_match_finish(struct readarg_parser *rp, const char **needle, const char *adv, struct readarg_opt *opt) {
-    if (adv)
-        *needle = adv;
+    if (loose.opt)
+        return rp->state.curr.opt = loose.opt;
 
-    if (opt)
-        rp->state.curr.opt = opt;
-
-    return opt;
+    return NULL;
 }
 
 static void readarg_update_opt(struct readarg_parser *rp, const char *attach, struct readarg_opt *opt) {
