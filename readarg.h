@@ -64,11 +64,6 @@ struct readarg_parser {
     enum readarg_error error;
 };
 
-enum readarg_helpgen_format {
-    READARG_HELPGEN_FORMAT_PLAIN,
-    READARG_HELPGEN_FORMAT_MDOC,
-};
-
 struct readarg_helpgen_writer {
     /* A falsy return value should indicate to the caller that an error occured. */
     int (*write)(void *ctx, const char *buf, size_t len);
