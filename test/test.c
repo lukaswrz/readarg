@@ -13,6 +13,13 @@ enum opt {
 static int write_callback(void *ctx, const char *buf, size_t len);
 
 int main(int argc, char **argv) {
+    const char *progname = argv[0] == NULL ? "test" : argv[0];
+
+    struct readarg_helpgen_writer writer = {
+        .write = write_callback,
+        .ctx = NULL,
+    };
+
     struct readarg_opt opts[] = {
         [OPT_HELP] = {
             .names = {
@@ -126,15 +133,7 @@ int main(int argc, char **argv) {
                             .len = argc - 1,
                         });
 
-    while (readarg_parse(&rp))
-        ;
-
-    const char *progname = argv[0] == NULL ? "test" : argv[0];
-    struct readarg_helpgen_writer writer = {
-        .write = write_callback,
-        .ctx = NULL,
-    };
-
+    while (readarg_parse(&rp));
     if (rp.error != READARG_ESUCCESS) {
         fprintf(stderr, "Error: %d\n", rp.error);
         readarg_helpgen_put_usage(&rp, &writer, progname, "Usage");
@@ -153,6 +152,13 @@ int main(int argc, char **argv) {
 
     struct readarg_opt *erropt = readarg_validate_opts(&rp);
     if (erropt != NULL) {
+        fprintf(stderr, "Error: %d\n", rp.error);
+        readarg_helpgen_put_usage(&rp, &writer, progname, "Usage");
+        return 1;
+    }
+
+    readarg_assign_opers(&rp);
+    if (rp.error != READARG_ESUCCESS) {
         fprintf(stderr, "Error: %d\n", rp.error);
         readarg_helpgen_put_usage(&rp, &writer, progname, "Usage");
         return 1;

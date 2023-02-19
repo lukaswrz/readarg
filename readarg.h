@@ -533,11 +533,7 @@ static void readarg_add_val(struct readarg_parser *rp, struct readarg_arg *arg, 
 }
 
 static const char *readarg_skip_incl(const char *outer, const char *inner) {
-    while (*inner == *outer) {
-        if (!*inner)
-            return outer;
-        ++inner, ++outer;
-    }
+    for (; *inner && *inner == *outer; ++inner, ++outer);
     return !*inner ? outer : NULL;
 }
 
