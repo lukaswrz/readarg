@@ -94,14 +94,13 @@ size_t readarg_select_lower(struct readarg_bounds bounds);
 #undef NDEBUG
 #endif
 
-#define READARG_HELPGEN_TRY(writer, buf, len)                                  \
+#define READARG_HELPGEN_TRY_BUF(writer, buf, len)                              \
     do {                                                                       \
         int readarg_helpgen_rv = (writer)->write((writer)->ctx, (buf), (len)); \
         if (!readarg_helpgen_rv)                                               \
             return readarg_helpgen_rv;                                         \
     } while (0)
-#define READARG_HELPGEN_TRY_LIT(writer, s) READARG_HELPGEN_TRY((writer), (s), (sizeof(s) - 1))
-#define READARG_HELPGEN_TRY_STR(writer, s) READARG_HELPGEN_TRY((writer), (s), (strlen((s))))
+#define READARG_HELPGEN_TRY_STR(writer, s) READARG_HELPGEN_TRY_BUF((writer), (s), (strlen((s))))
 
 #include <assert.h>
 #include <string.h>
@@ -167,10 +166,10 @@ void readarg_parser_init(struct readarg_parser *rp, struct readarg_opt *opts, si
 
 int readarg_helpgen_put_usage(struct readarg_parser *rp, struct readarg_helpgen_writer *writer, const char *progname, const char *usage) {
     READARG_HELPGEN_TRY_STR(writer, usage);
-    READARG_HELPGEN_TRY_LIT(writer, ":\n");
+    READARG_HELPGEN_TRY_STR(writer, ":\n");
 
     READARG_HELPGEN_TRY_STR(writer, progname);
-    READARG_HELPGEN_TRY_LIT(writer, "\n");
+    READARG_HELPGEN_TRY_STR(writer, "\n");
 
     int optwritten = 0, operwritten = 0;
     int next;
@@ -181,7 +180,7 @@ int readarg_helpgen_put_usage(struct readarg_parser *rp, struct readarg_helpgen_
         optwritten = 1;
 
         if (i == 0)
-            READARG_HELPGEN_TRY_LIT(writer, "  ");
+            READARG_HELPGEN_TRY_STR(writer, "  ");
 
         next = i + 1 < rp->nopts;
         size_t lower = readarg_select_lower(opts[i].arg.bounds);
@@ -191,7 +190,7 @@ int readarg_helpgen_put_usage(struct readarg_parser *rp, struct readarg_helpgen_
 
         for (size_t j = 0; j < (upper ? upper : !!inf); j++) {
             if (j >= lower)
-                READARG_HELPGEN_TRY_LIT(writer, "[");
+                READARG_HELPGEN_TRY_STR(writer, "[");
 
             for (size_t k = 0; k < nforms; k++) {
                 int grp = 0;
@@ -199,11 +198,11 @@ int readarg_helpgen_put_usage(struct readarg_parser *rp, struct readarg_helpgen_
                     for (size_t l = 0; opts[i].names[k][l]; l++) {
                         if (!grp) {
                             if (k == READARG_FORM_SHORT) {
-                                READARG_HELPGEN_TRY_LIT(writer, "-");
+                                READARG_HELPGEN_TRY_STR(writer, "-");
                             }
 
                             if (k == READARG_FORM_LONG) {
-                                READARG_HELPGEN_TRY_LIT(writer, "--");
+                                READARG_HELPGEN_TRY_STR(writer, "--");
                             }
                         }
 
@@ -212,31 +211,31 @@ int readarg_helpgen_put_usage(struct readarg_parser *rp, struct readarg_helpgen_
                         if (k == READARG_FORM_SHORT) {
                             grp = 1;
                             if (!opts[i].names[k][l + 1])
-                                READARG_HELPGEN_TRY_LIT(writer, ", ");
+                                READARG_HELPGEN_TRY_STR(writer, ", ");
                             continue;
                         } else if (k + 1 < nforms || opts[i].names[k][l + 1]) {
-                            READARG_HELPGEN_TRY_LIT(writer, ", ");
+                            READARG_HELPGEN_TRY_STR(writer, ", ");
                         } else if (opts[i].arg.name) {
-                            READARG_HELPGEN_TRY_LIT(writer, " ");
+                            READARG_HELPGEN_TRY_STR(writer, " ");
                             READARG_HELPGEN_TRY_STR(writer, opts[i].arg.name);
 
                             if (inf)
-                                READARG_HELPGEN_TRY_LIT(writer, "...");
+                                READARG_HELPGEN_TRY_STR(writer, "...");
                         }
                     }
                 }
             }
 
             if (j >= lower)
-                READARG_HELPGEN_TRY_LIT(writer, "]");
+                READARG_HELPGEN_TRY_STR(writer, "]");
 
             if (next)
-                READARG_HELPGEN_TRY_LIT(writer, "\n  ");
+                READARG_HELPGEN_TRY_STR(writer, "\n  ");
         }
     }
 
     if (optwritten)
-        READARG_HELPGEN_TRY_LIT(writer, "\n");
+        READARG_HELPGEN_TRY_STR(writer, "\n");
 
     struct readarg_arg *opers = rp->opers;
     next = !!rp->nopers;
@@ -244,7 +243,7 @@ int readarg_helpgen_put_usage(struct readarg_parser *rp, struct readarg_helpgen_
         operwritten = 1;
 
         if (i == 0)
-            READARG_HELPGEN_TRY_LIT(writer, "  ");
+            READARG_HELPGEN_TRY_STR(writer, "  ");
 
         next = i + 1 < rp->nopers;
         size_t lower = readarg_select_lower(opers[i].bounds);
@@ -255,30 +254,30 @@ int readarg_helpgen_put_usage(struct readarg_parser *rp, struct readarg_helpgen_
             READARG_HELPGEN_TRY_STR(writer, opers[i].name);
 
             if (inf && j + 1 == lower)
-                READARG_HELPGEN_TRY_LIT(writer, "...");
+                READARG_HELPGEN_TRY_STR(writer, "...");
 
             if (next)
-                READARG_HELPGEN_TRY_LIT(writer, "\n  ");
+                READARG_HELPGEN_TRY_STR(writer, "\n  ");
         }
 
         size_t amt = upper ? upper : inf ? lower + 1 : 0;
         for (size_t j = lower; j < amt; j++) {
-            READARG_HELPGEN_TRY_LIT(writer, "[");
+            READARG_HELPGEN_TRY_STR(writer, "[");
 
             READARG_HELPGEN_TRY_STR(writer, opers[i].name);
 
             if (inf && j + 1 == amt)
-                READARG_HELPGEN_TRY_LIT(writer, "...");
+                READARG_HELPGEN_TRY_STR(writer, "...");
 
-            READARG_HELPGEN_TRY_LIT(writer, "]");
+            READARG_HELPGEN_TRY_STR(writer, "]");
 
             if (next)
-                READARG_HELPGEN_TRY_LIT(writer, "\n  ");
+                READARG_HELPGEN_TRY_STR(writer, "\n  ");
         }
     }
 
     if (operwritten)
-        READARG_HELPGEN_TRY_LIT(writer, "\n");
+        READARG_HELPGEN_TRY_STR(writer, "\n");
 
     return 1;
 }
